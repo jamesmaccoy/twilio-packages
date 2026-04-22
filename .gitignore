@@ -1,0 +1,18 @@
+build
+dist / media
+node_modules
+.DS_Store
+.env
+.next
+.vercel
+
+# Lock files (using pnpm)
+package-lock.json
+npm-shrinkwrap.json
+yarn.lock
+
+# Payload default media upload directory
+public/media/
+
+public/robots.txt
+public/sitemap*.xml
