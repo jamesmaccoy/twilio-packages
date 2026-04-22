@@ -14,35 +14,45 @@ export async function GET(request: NextRequest) {
 
     // Fallback: if Payload didn't pick up cookies, try JWT header auth using cookie token.
     // This helps in environments where cookie parsing differs between runtimes.
-    if (!user) {
-      const prefixToken = request.cookies.get(`${payload.config.cookiePrefix}-token`)?.value
-      const legacyToken = request.cookies.get('payload-token')?.value
-      const token = prefixToken || legacyToken
+    const prefixToken = request.cookies.get(`${payload.config.cookiePrefix}-token`)?.value
+    const legacyToken = request.cookies.get('payload-token')?.value
+    const authTokens = [prefixToken, legacyToken].filter(
+      (token, index, self): token is string => Boolean(token) && self.indexOf(token) === index,
+    )
 
-      if (token) {
+    if (!user && authTokens.length > 0) {
+      for (const token of authTokens) {
         const headers = new Headers(request.headers)
         headers.set('authorization', `JWT ${token}`)
-        ;({ user } = await payload.auth({ headers }))
+        const authResult = await payload.auth({ headers })
+        if (authResult.user) {
+          user = authResult.user
+          break
+        }
       }
     }
 
     // Final fallback: directly verify JWT and load user.
     // (If payload.auth fails due to runtime header/cookie differences, this still unblocks the app.)
-    if (!user) {
-      const token =
-        request.cookies.get(`${payload.config.cookiePrefix}-token`)?.value ||
-        request.cookies.get('payload-token')?.value
+    if (!user && authTokens.length > 0) {
+      for (const token of authTokens) {
+        try {
+          const decoded = jwt.verify(token, payload.secret) as unknown
+          const id =
+            typeof decoded === 'object' && decoded !== null && 'id' in decoded
+              ? (decoded as any).id
+              : null
 
-      if (token) {
-        const decoded = jwt.verify(token, payload.secret) as unknown
-        const id =
-          typeof decoded === 'object' && decoded !== null && 'id' in decoded ? (decoded as any).id : null
-        if (typeof id === 'string' && id.length > 0) {
-          user = await payload.findByID({
-            collection: 'users',
-            id,
-            overrideAccess: true,
-          })
+          if (typeof id === 'string' && id.length > 0) {
+            user = await payload.findByID({
+              collection: 'users',
+              id,
+              overrideAccess: true,
+            })
+            break
+          }
+        } catch {
+          continue
         }
       }
     }

@@ -77,7 +77,7 @@ export default function EmailAuthForm() {
   const [password, setPassword] = React.useState('')
   const router = useRouter()
   const searchParams = useSearchParams()
-  const next = searchParams.get('next')
+  const next = searchParams.get('next') || searchParams.get('redirect')
 
   const { handleAuthChange } = useUserContext()
   const { isSubscribed, isLoading: isSubscriptionLoading } = useSubscription()

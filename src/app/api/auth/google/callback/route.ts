@@ -96,13 +96,20 @@ export async function GET(request: NextRequest) {
     })
 
     const response = NextResponse.redirect(`${baseUrl}${state}`)
-    response.cookies.set('payload-token', authToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+    const cookieOptions = {
       path: '/',
-      maxAge: 60 * 60 * 24 * 7,
-    })
+      httpOnly: true,
+      maxAge: collectionConfig.auth.tokenExpiration,
+      secure: collectionConfig.auth.cookies.secure,
+      sameSite:
+        typeof collectionConfig.auth.cookies.sameSite === 'string'
+          ? (collectionConfig.auth.cookies.sameSite.toLowerCase() as 'lax' | 'strict' | 'none')
+          : collectionConfig.auth.cookies.sameSite,
+      domain: collectionConfig.auth.cookies.domain,
+    } as const
+
+    response.cookies.set(`${payload.config.cookiePrefix}-token`, authToken, cookieOptions)
+    response.cookies.set('payload-token', authToken, cookieOptions)
 
     return response
   } catch (error) {

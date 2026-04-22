@@ -40,12 +40,21 @@ export async function POST(request: NextRequest) {
       user: safeUser
     })
 
+    const collectionConfig = payload.collections['users']?.config
+    if (!collectionConfig) {
+      throw new Error('Users collection config not found')
+    }
+
     const cookieOptions = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
       path: '/',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
+      httpOnly: true,
+      maxAge: collectionConfig.auth.tokenExpiration,
+      secure: collectionConfig.auth.cookies.secure,
+      sameSite:
+        typeof collectionConfig.auth.cookies.sameSite === 'string'
+          ? (collectionConfig.auth.cookies.sameSite.toLowerCase() as 'lax' | 'strict' | 'none')
+          : collectionConfig.auth.cookies.sameSite,
+      domain: collectionConfig.auth.cookies.domain,
     } as const
 
     // Set the authentication cookies (support both legacy + Payload prefix)

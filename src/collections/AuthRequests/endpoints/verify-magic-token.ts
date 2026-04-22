@@ -52,6 +52,13 @@ export const VerifyMagicToken: Endpoint = {
         authRequest.email !== email ||
         new Date(authRequest.expiresAt) < new Date()
       ) {
+        if (authRequest && new Date(authRequest.expiresAt) < new Date()) {
+          await req.payload.delete({
+            collection: 'authRequests',
+            id: authRequest.id,
+            overrideAccess: true,
+          })
+        }
         return Response.json(
           {
             message: 'Invalid token',
@@ -127,6 +134,12 @@ export const VerifyMagicToken: Endpoint = {
             ? (collectionConfig.auth.cookies.sameSite.toLowerCase() as 'lax' | 'strict' | 'none')
             : collectionConfig.auth.cookies.sameSite,
         domain: collectionConfig.auth.cookies.domain,
+      })
+
+      await req.payload.delete({
+        collection: 'authRequests',
+        id: authRequest.id,
+        overrideAccess: true,
       })
 
       const next =

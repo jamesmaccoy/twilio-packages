@@ -2,15 +2,10 @@
 
 import React from 'react'
 import EmailAuthForm from './_components/EmailAuthForm'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { CheckCircle2Icon, Command, Quote } from 'lucide-react'
+import { Command, Quote } from 'lucide-react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
 
 export default function LoginPage() {
-  const searchParams = useSearchParams()
-  const registered = searchParams.get('registered') === 'true'
-
   return (
     <div className="w-full min-h-screen grid lg:grid-cols-2">
       {/* Left Side - Marketing / Hero */}
@@ -43,7 +38,7 @@ export default function LoginPage() {
               "Quaint but fun.. especially for surf holiday.."
             </p>
             <footer className="text-sm text-zinc-400 mt-4">
-              Vuyo
+              Vuyo Radebe
               <span className="block text-xs text-zinc-500 mt-1">
                 ⭐️⭐️⭐️
               </span>
@@ -54,16 +49,6 @@ export default function LoginPage() {
 
       {/* Right Side - Form */}
       <div className="relative flex flex-col items-center justify-center p-8 bg-white">
-        {/* Top Right Register Link */}
-        <div className="absolute right-8 top-8">
-          <Link
-            href="/register"
-            className="text-sm font-medium hover:text-zinc-900 transition-colors text-zinc-900"
-          >
-            Register
-          </Link>
-        </div>
-
         {/* Mobile Logo (visible only on small screens) */}
         <div className="lg:hidden absolute top-8 left-8 flex items-center gap-2 font-medium">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 text-white">
@@ -76,35 +61,19 @@ export default function LoginPage() {
           {/* Header */}
           <div className="mb-8 text-center">
             <h1 className="text-3xl font-bold tracking-tight text-zinc-900 mb-2">
-              Welcome back
+              Sign in or create your account
             </h1>
             <p className="text-zinc-500 text-base">
-              Login to access your account
+              Use your email, mobile, password, or Google in one flow
             </p>
           </div>
-
-          {/* Success Alert */}
-          {registered && (
-            <Alert className="mb-6 border-green-500 bg-green-50 dark:bg-green-950/20">
-              <CheckCircle2Icon className="h-4 w-4 text-green-600 dark:text-green-400" />
-              <AlertDescription className="text-green-800 dark:text-green-200">
-                Registration successful! Please log in with your email and password.
-              </AlertDescription>
-            </Alert>
-          )}
 
           <EmailAuthForm />
 
           {/* Footer */}
           <div className="mt-6 space-y-3">
             <p className="text-center text-sm text-zinc-500">
-              Don&apos;t have an account?{' '}
-              <Link
-                href="/register"
-                className="font-medium text-zinc-900 hover:text-zinc-700 hover:underline"
-              >
-                Register now
-              </Link>
+              New here? Continue with email, mobile, or Google and we&apos;ll create your account if needed.
             </p>
             <p className="text-center text-xs text-zinc-400">
               By continuing, you agree to our{' '}

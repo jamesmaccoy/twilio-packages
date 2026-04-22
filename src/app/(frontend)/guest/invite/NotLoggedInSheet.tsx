@@ -113,7 +113,7 @@ export function NotLoggedInSheet({ token }: Props) {
                 variant="secondary"
                 className="flex-1 bg-slate-800 text-slate-50 hover:bg-slate-700 border border-neutral-700"
               >
-                <Link href={`/register?next=/i/${token}`}>Register</Link>
+                <Link href={`/login?next=/i/${token}`}>Continue</Link>
               </Button>
             </div>
           </div>
