@@ -13,6 +13,11 @@ const bodySchema = z.object({
     .regex(/^\+[1-9]\d+$/, 'Mobile number must be in E.164 format (e.g. +27821234567)'),
 })
 
+function cleanEnv(value: string | undefined): string | undefined {
+  if (!value) return undefined
+  return value.trim().replace(/^['"]|['"]$/g, '')
+}
+
 export const InitiateMagicAuth: Endpoint = {
   method: 'post',
   path: '/magic',
@@ -30,9 +35,9 @@ export const InitiateMagicAuth: Endpoint = {
     }
 
     const { mobile } = body.data
-    const accountSid = process.env.TWILIO_ACCOUNT_SID?.trim()
-    const authToken = process.env.TWILIO_AUTH_TOKEN?.trim()
-    const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID?.trim()
+    const accountSid = cleanEnv(process.env.TWILIO_ACCOUNT_SID)
+    const authToken = cleanEnv(process.env.TWILIO_AUTH_TOKEN)
+    const verifyServiceSid = cleanEnv(process.env.TWILIO_VERIFY_SERVICE_SID)
 
     if (!accountSid || !authToken || !verifyServiceSid) {
       return Response.json(

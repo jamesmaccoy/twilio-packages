@@ -15,6 +15,31 @@ const bodySchema = z.object({
   mode: z.enum(['login', 'onboarding']).optional(),
 })
 
+function cleanEnv(value: string | undefined): string | undefined {
+  if (!value) return undefined
+  return value.trim().replace(/^['"]|['"]$/g, '')
+}
+
+function getCookieValue(cookieHeader: string | null, name: string): string | null {
+  if (!cookieHeader) return null
+  const parts = cookieHeader.split(';')
+  for (const part of parts) {
+    const [k, ...v] = part.trim().split('=')
+    if (k === name) return decodeURIComponent(v.join('='))
+  }
+  return null
+}
+
+function getAnyTokenCookie(cookieHeader: string | null): string | null {
+  if (!cookieHeader) return null
+  const parts = cookieHeader.split(';').map((p) => p.trim())
+  for (const part of parts) {
+    const [k, ...v] = part.split('=')
+    if (k && k.endsWith('-token')) return decodeURIComponent(v.join('='))
+  }
+  return null
+}
+
 export const VerifyCode: Endpoint = {
   method: 'post',
   path: '/verify-code',
@@ -62,9 +87,9 @@ export const VerifyCode: Endpoint = {
       )
     }
 
-    const accountSid = process.env.TWILIO_ACCOUNT_SID?.trim()
-    const authToken = process.env.TWILIO_AUTH_TOKEN?.trim()
-    const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID?.trim()
+    const accountSid = cleanEnv(process.env.TWILIO_ACCOUNT_SID)
+    const authToken = cleanEnv(process.env.TWILIO_AUTH_TOKEN)
+    const verifyServiceSid = cleanEnv(process.env.TWILIO_VERIFY_SERVICE_SID)
 
     if (!accountSid || !authToken || !verifyServiceSid) {
       return Response.json(
@@ -91,7 +116,33 @@ export const VerifyCode: Endpoint = {
 
     // OTP is valid, proceed with onboarding flow for authenticated users
     if (mode === 'onboarding') {
-      if (!req.user?.id) {
+      let userId = req.user?.id
+
+      // In some runtimes, Payload endpoints may not populate req.user even though the session cookie exists.
+      // For onboarding, fall back to verifying the JWT from cookies to identify the current user.
+      if (!userId) {
+        const cookieHeader = req.headers?.get?.('cookie') || null
+        const legacyToken = getCookieValue(cookieHeader, 'payload-token')
+        const prefixToken = getAnyTokenCookie(cookieHeader)
+        const token = prefixToken || legacyToken
+
+        if (token) {
+          try {
+            const decoded = jwt.verify(token, req.payload.secret) as unknown
+            const id =
+              typeof decoded === 'object' && decoded !== null && 'id' in decoded
+                ? (decoded as { id?: unknown }).id
+                : null
+            if (typeof id === 'string' && id.length > 0) {
+              userId = id
+            }
+          } catch {
+            // ignore
+          }
+        }
+      }
+
+      if (!userId) {
         return Response.json(
           {
             message: 'Unauthorized',
@@ -111,7 +162,7 @@ export const VerifyCode: Endpoint = {
             },
             {
               id: {
-                not_equals: req.user.id,
+                not_equals: userId,
               },
             },
           ],
@@ -132,7 +183,7 @@ export const VerifyCode: Endpoint = {
 
       await req.payload.update({
         collection: 'users',
-        id: req.user.id,
+        id: userId,
         data: {
           mobile,
           mobileVerified: true,
