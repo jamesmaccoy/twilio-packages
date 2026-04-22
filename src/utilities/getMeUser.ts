@@ -1,5 +1,6 @@
 import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
+import jwt from 'jsonwebtoken'
 
 import type { User } from '../payload-types'
 import { getPayload } from 'payload'
@@ -43,6 +44,35 @@ export const getMeUser = async (args?: {
           ok = true
           token = authToken
           break
+        }
+      }
+    }
+
+    if (!user && authTokens.length > 0) {
+      for (const authToken of authTokens) {
+        try {
+          const decoded = jwt.verify(authToken, payload.secret) as unknown
+          const id =
+            typeof decoded === 'object' && decoded !== null && 'id' in decoded
+              ? (decoded as { id?: unknown }).id
+              : null
+
+          if (typeof id === 'string' && id.length > 0) {
+            const fallbackUser = await payload.findByID({
+              collection: 'users',
+              id,
+              overrideAccess: true,
+            })
+
+            if (fallbackUser) {
+              user = fallbackUser as User
+              ok = true
+              token = authToken
+              break
+            }
+          }
+        } catch {
+          continue
         }
       }
     }
