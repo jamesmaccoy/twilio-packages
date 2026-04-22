@@ -106,6 +106,7 @@ export const VerifyMagicToken: Endpoint = {
                 name: generatedName,
                 mobile,
                 role: 'customer',
+                mobileVerified: false,
               },
               overrideAccess: true,
             })
@@ -180,7 +181,11 @@ export const VerifyMagicToken: Endpoint = {
       const baseUrl =
         process.env.NEXT_PUBLIC_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
 
-      return Response.redirect(`${baseUrl}${next || '/bookings'}`)
+      const target = user.mobileVerified
+        ? next || '/bookings'
+        : `/onboarding/mobile?next=${encodeURIComponent(next || '/bookings')}`
+
+      return Response.redirect(`${baseUrl}${target}`)
     } catch (err) {
       console.error('Error verifying magic token:', err)
 

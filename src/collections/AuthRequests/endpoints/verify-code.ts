@@ -12,6 +12,7 @@ const bodySchema = z.object({
     .regex(/^\+[1-9]\d+$/, 'Mobile number must be in E.164 format (e.g. +27821234567)'),
   requestId: z.string(),
   otp: z.string().min(6).max(6),
+  mode: z.enum(['login', 'onboarding']).optional(),
 })
 
 export const VerifyCode: Endpoint = {
@@ -30,7 +31,7 @@ export const VerifyCode: Endpoint = {
       )
     }
 
-    const { mobile, requestId, otp } = body.data
+    const { mobile, requestId, otp, mode = 'login' } = body.data
 
     const authRequest = await req.payload.findByID({
       id: requestId,
@@ -61,9 +62,9 @@ export const VerifyCode: Endpoint = {
       )
     }
 
-    const accountSid = process.env.TWILIO_ACCOUNT_SID
-    const authToken = process.env.TWILIO_AUTH_TOKEN
-    const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID
+    const accountSid = process.env.TWILIO_ACCOUNT_SID?.trim()
+    const authToken = process.env.TWILIO_AUTH_TOKEN?.trim()
+    const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID?.trim()
 
     if (!accountSid || !authToken || !verifyServiceSid) {
       return Response.json(
@@ -88,7 +89,73 @@ export const VerifyCode: Endpoint = {
       )
     }
 
-    // OTP is valid, proceed with authentication
+    // OTP is valid, proceed with onboarding flow for authenticated users
+    if (mode === 'onboarding') {
+      if (!req.user?.id) {
+        return Response.json(
+          {
+            message: 'Unauthorized',
+          },
+          { status: 401 },
+        )
+      }
+
+      const existingUserForMobile = await req.payload.find({
+        collection: 'users',
+        where: {
+          and: [
+            {
+              mobile: {
+                equals: mobile,
+              },
+            },
+            {
+              id: {
+                not_equals: req.user.id,
+              },
+            },
+          ],
+        },
+        overrideAccess: true,
+        pagination: false,
+        limit: 1,
+      })
+
+      if (existingUserForMobile.docs.length > 0) {
+        return Response.json(
+          {
+            message: 'This mobile number is already linked to another account',
+          },
+          { status: 409 },
+        )
+      }
+
+      await req.payload.update({
+        collection: 'users',
+        id: req.user.id,
+        data: {
+          mobile,
+          mobileVerified: true,
+        },
+        overrideAccess: true,
+      })
+
+      await req.payload.delete({
+        collection: 'authRequests',
+        id: authRequest.id,
+        overrideAccess: true,
+      })
+
+      return Response.json(
+        {
+          message: 'Mobile number verified successfully',
+          mobileVerified: true,
+        },
+        { status: 200 },
+      )
+    }
+
+    // OTP is valid, proceed with login flow
 
     const users = await req.payload.find({
       collection: 'users',
@@ -153,9 +220,16 @@ export const VerifyCode: Endpoint = {
       domain: collectionConfig.auth.cookies.domain,
     })
 
+    await req.payload.delete({
+      collection: 'authRequests',
+      id: authRequest.id,
+      overrideAccess: true,
+    })
+
     return Response.json(
       {
         message: 'OTP verified successfully',
+        mobileVerified: Boolean((user as any).mobileVerified),
       },
       { status: 200 },
     )

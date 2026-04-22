@@ -34,6 +34,11 @@ export const Users: CollectionConfig = {
       unique: true,
     },
     {
+      name: 'mobileVerified',
+      type: 'checkbox',
+      defaultValue: false,
+    },
+    {
       name: 'role',
       type: 'select',
       options: [

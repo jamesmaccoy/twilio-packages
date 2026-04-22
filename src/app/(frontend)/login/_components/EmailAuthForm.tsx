@@ -167,9 +167,18 @@ export default function EmailAuthForm() {
         throw new Error('Invalid email or password')
       }
 
+      const data = await res.json().catch(() => null)
       handleAuthChange()
 
       const validatedNext = validateRedirect(next)
+      if (data?.user && data.user.mobileVerified === false) {
+        const mobileOnboardingPath = validatedNext
+          ? `/onboarding/mobile?next=${encodeURIComponent(validatedNext)}`
+          : '/onboarding/mobile?next=%2Fbookings'
+        router.push(mobileOnboardingPath)
+        return
+      }
+
       if (validatedNext) {
         router.push(validatedNext)
         return
@@ -198,10 +207,19 @@ export default function EmailAuthForm() {
         credentials: 'include',
       })
       if (!res.ok) throw new Error('Invalid OTP')
+      const data = await res.json().catch(() => null)
       // Optionally: handleAuthChange()
       // Optionally: validateRedirect
       handleAuthChange()
-      router.push(next && typeof next === 'string' ? next : '/bookings')
+      const validatedNext = validateRedirect(next)
+      if (data?.mobileVerified === false) {
+        const mobileOnboardingPath = validatedNext
+          ? `/onboarding/mobile?next=${encodeURIComponent(validatedNext)}`
+          : '/onboarding/mobile?next=%2Fbookings'
+        router.push(mobileOnboardingPath)
+        return
+      }
+      router.push(validatedNext || '/bookings')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Invalid OTP')
     } finally {

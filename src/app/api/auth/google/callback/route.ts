@@ -76,6 +76,7 @@ export async function GET(request: NextRequest) {
           mobile: `+27${Math.floor(Math.random() * 900000000 + 100000000)}`,
           password: crypto.randomBytes(20).toString('hex'),
           role: 'customer',
+          mobileVerified: false,
         },
       })
     }
@@ -95,7 +96,10 @@ export async function GET(request: NextRequest) {
       expiresIn: collectionConfig.auth.tokenExpiration,
     })
 
-    const response = NextResponse.redirect(`${baseUrl}${state}`)
+    const destination = user.mobileVerified
+      ? state
+      : `/onboarding/mobile?next=${encodeURIComponent(state)}`
+    const response = NextResponse.redirect(`${baseUrl}${destination}`)
     const cookieOptions = {
       path: '/',
       httpOnly: true,

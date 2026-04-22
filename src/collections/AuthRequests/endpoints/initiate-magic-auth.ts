@@ -30,9 +30,9 @@ export const InitiateMagicAuth: Endpoint = {
     }
 
     const { mobile } = body.data
-    const accountSid = process.env.TWILIO_ACCOUNT_SID
-    const authToken = process.env.TWILIO_AUTH_TOKEN
-    const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID
+    const accountSid = process.env.TWILIO_ACCOUNT_SID?.trim()
+    const authToken = process.env.TWILIO_AUTH_TOKEN?.trim()
+    const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID?.trim()
 
     if (!accountSid || !authToken || !verifyServiceSid) {
       return Response.json(

@@ -38,6 +38,10 @@ export default async function Bookings() {
     redirect('/login?next=/bookings')
   }
 
+  if (!user.mobileVerified) {
+    redirect('/onboarding/mobile?next=/bookings')
+  }
+
   const [upcomingBookings, pastBookings] = await Promise.all([
     getBookings('upcoming', user),
     getBookings('past', user),

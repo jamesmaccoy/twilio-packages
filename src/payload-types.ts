@@ -257,6 +257,7 @@ export interface User {
   id: string;
   name: string;
   mobile: string;
+  mobileVerified?: boolean | null;
   role: 'guest' | 'customer' | 'host' | 'admin';
   subscriptionStatus?: {
     status?: ('none' | 'trial' | 'active' | 'past_due' | 'canceled') | null;
@@ -1851,6 +1852,7 @@ export interface CategoriesSelect<T extends boolean = true> {
 export interface UsersSelect<T extends boolean = true> {
   name?: T;
   mobile?: T;
+  mobileVerified?: T;
   role?: T;
   subscriptionStatus?:
     | T
