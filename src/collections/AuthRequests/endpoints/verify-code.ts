@@ -3,6 +3,7 @@ import { Endpoint } from 'payload'
 import { z } from 'zod'
 import jwt from 'jsonwebtoken'
 import Twilio from 'twilio'
+import crypto from 'node:crypto'
 
 const bodySchema = z.object({
   mobile: z
@@ -38,6 +39,11 @@ function getAnyTokenCookie(cookieHeader: string | null): string | null {
     if (k && k.endsWith('-token')) return decodeURIComponent(v.join('='))
   }
   return null
+}
+
+function emailForMobile(mobile: string): string {
+  const digits = mobile.replace(/\D/g, '')
+  return `mobile-${digits}@phone.simpleplek.invalid`
 }
 
 export const VerifyCode: Endpoint = {
@@ -220,20 +226,50 @@ export const VerifyCode: Endpoint = {
       limit: 1,
     })
 
-    const user = users.docs[0]
+    let user = users.docs[0]
 
+    // If the OTP is verified but the user doesn't exist yet, create a customer account.
+    // We mark the mobile as verified since Twilio Verify approved the OTP.
     if (!user) {
-      return Response.json(
-        {
-          message: 'No account found for this mobile number',
+      const newUserEmail = emailForMobile(mobile)
+
+      const existingEmail = await req.payload.find({
+        collection: 'users',
+        where: {
+          email: {
+            equals: newUserEmail,
+          },
         },
-        { status: 404 },
-      )
+        overrideAccess: true,
+        pagination: false,
+        limit: 1,
+      })
+
+      if (existingEmail.docs.length > 0) {
+        user = existingEmail.docs[0]
+      } else {
+        user = await req.payload.create({
+          collection: 'users',
+          data: {
+            email: newUserEmail,
+            name: mobile,
+            mobile,
+            mobileVerified: true,
+            role: 'customer',
+            password: crypto.randomBytes(20).toString('hex'),
+          },
+          overrideAccess: true,
+        })
+      }
     }
 
     const collectionConfig = req.payload.collections['users']?.config
     if (!collectionConfig) {
       throw new Error('Users collection config not found')
+    }
+
+    if (!user) {
+      throw new Error('User not found after OTP verification')
     }
 
     const tokenPayload = {
