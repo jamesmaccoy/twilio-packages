@@ -3,7 +3,6 @@ import { getPayload } from 'payload'
 import configPromise from '@payload-config'
 import React from 'react'
 import { HomepageEditorial } from '@/components/HomepageEditorial'
-import { ScriptVideoBackground } from '@/components/ScriptVideoBackground'
 import { homeStatic } from '@/endpoints/seed/home-static'
 import { draftMode } from 'next/headers'
 import { cache } from 'react'
@@ -54,7 +53,6 @@ export default async function HomeEditorialPage() {
 
   return (
     <>
-      <ScriptVideoBackground featuredPosts={posts.docs} sceneIndices={[1, 2, 6]} />
       <HomepageEditorial featuredPosts={posts.docs} />
     </>
   )

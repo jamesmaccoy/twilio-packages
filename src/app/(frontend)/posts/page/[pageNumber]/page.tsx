@@ -8,6 +8,7 @@ import { getPayload } from 'payload'
 import React from 'react'
 import PageClient from './page.client'
 import { notFound } from 'next/navigation'
+import { PropertyReviews } from '../../_components/PropertyReviews.client'
 
 export const revalidate = 600
 
@@ -56,6 +57,8 @@ export default async function Page({ params: paramsPromise }: Args) {
             </p>
           </div>
         </div>
+
+        <PropertyReviews limit={6} />
 
         {/* Page Range */}
         <div className="container mb-12">

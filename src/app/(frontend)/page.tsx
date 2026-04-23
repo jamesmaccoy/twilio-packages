@@ -3,7 +3,6 @@ import { getPayload } from 'payload'
 import configPromise from '@payload-config'
 import React from 'react'
 import { HomepageEditorial } from '@/components/HomepageEditorial'
-import { ScriptVideoBackground } from '@/components/ScriptVideoBackground'
 import { homeStatic } from '@/endpoints/seed/home-static'
 import { draftMode } from 'next/headers'
 import { cache } from 'react'
@@ -26,24 +25,15 @@ export default async function HomeEditorialPage() {
   const payload = await getPayload({ config: configPromise })
   const posts = await payload.find({
     collection: 'posts',
-    depth: 2, // Increased depth to fully populate meta.image Media objects
-    limit: 10, // Fetch more to ensure we get park-estate if needed
+    depth: 2, // populate meta.image + categories
+    limit: 24,
     page: 1,
     overrideAccess: false,
     sort: '-publishedAt',
     where: {
-      and: [
-        {
-          _status: {
-            equals: 'published',
-          },
-        },
-        {
-          featured: {
-            equals: true,
-          },
-        },
-      ],
+      _status: {
+        equals: 'published',
+      },
     },
   })
 
@@ -54,7 +44,6 @@ export default async function HomeEditorialPage() {
 
   return (
     <>
-      <ScriptVideoBackground featuredPosts={posts.docs} sceneIndices={[2, 5, 6]} />
       <HomepageEditorial featuredPosts={posts.docs} />
     </>
   )

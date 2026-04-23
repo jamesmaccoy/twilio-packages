@@ -7,6 +7,7 @@ import configPromise from '@payload-config'
 import { getPayload } from 'payload'
 import React from 'react'
 import PageClient from './page.client'
+import { PropertyReviews } from './_components/PropertyReviews.client'
 
 export const dynamic = 'force-static'
 export const revalidate = 600
@@ -36,6 +37,8 @@ export default async function Page() {
           <h1>Posts</h1>
         </div>
       </div>
+
+      <PropertyReviews limit={6} />
 
       <div className="container mb-8">
         <PageRange

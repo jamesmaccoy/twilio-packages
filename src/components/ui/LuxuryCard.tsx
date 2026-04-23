@@ -13,6 +13,8 @@ interface LuxuryCardProps {
   subtitle?: string
   description?: string
   tags?: string
+  packageLabel?: string
+  packageMeta?: string
   href: string
   delay?: number
   layoutId?: string
@@ -24,6 +26,8 @@ export function LuxuryCard({
   subtitle,
   description,
   tags,
+  packageLabel,
+  packageMeta,
   href,
   delay = 0,
   layoutId,
@@ -89,6 +93,18 @@ export function LuxuryCard({
                 {subtitle}
               </span>
             )}
+
+            {packageLabel && (
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs border border-[#e5e5e5] bg-white text-[#0a0a0a]">
+                  {packageLabel}
+                </span>
+                {packageMeta && (
+                  <span className="text-xs text-[#999]">{packageMeta}</span>
+                )}
+              </div>
+            )}
+
             <h3 className="font-serif-display text-3xl text-[#0a0a0a] leading-tight group-hover:text-secondary transition-colors duration-300">
               {title}
             </h3>
