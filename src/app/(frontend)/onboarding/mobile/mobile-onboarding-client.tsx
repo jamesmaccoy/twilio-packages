@@ -76,7 +76,7 @@ export default function MobileOnboardingClient() {
       }
 
       handleAuthChange()
-      router.push(next)
+      router.push(`/onboarding/profile?next=${encodeURIComponent(next)}`)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to verify code')
     } finally {

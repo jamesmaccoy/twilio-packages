@@ -13,6 +13,10 @@ import Link from 'next/link'
 import { getGravatarUrl } from '@/utils/gravatar'
 import { Gravatar } from '@/components/Gravatar'
 
+function isPlaceholderMobileEmail(email?: string | null): boolean {
+  return Boolean(email && email.endsWith('@phone.simpleplek.invalid'))
+}
+
 type YocoTransaction = {
   id: string
   packageName?: string
@@ -58,6 +62,12 @@ export default function AccountClient({ user }: AccountClientProps) {
   const [loadingProducts, setLoadingProducts] = useState(false)
   const [activeProducts, setActiveProducts] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState<'features' | 'transactions' | 'activity'>('features')
+
+  if (!user) return null
+  const missingName = !user.name || String(user.name).trim().length === 0
+  const missingEmail = !user.email || isPlaceholderMobileEmail(user.email)
+  const missingMobile = !(user as any).mobile || !(user as any).mobileVerified
+  const missingRequiredInfo = missingName || missingEmail || missingMobile
 
   useEffect(() => {
     const loadTransactions = async () => {
@@ -369,6 +379,30 @@ export default function AccountClient({ user }: AccountClientProps) {
                   </div>
                 </div>
 
+                {missingRequiredInfo && (
+                  <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    <div className="font-medium">Action required: complete your profile</div>
+                    <div className="mt-1 text-amber-800">
+                      We need your{' '}
+                      {[
+                        missingName ? 'name' : null,
+                        missingEmail ? 'email' : null,
+                        missingMobile ? 'verified mobile number' : null,
+                      ]
+                        .filter(Boolean)
+                        .join(', ')}{' '}
+                      to meet legal requirements.
+                    </div>
+                    <div className="mt-3">
+                      <Link href={`/onboarding/profile?next=${encodeURIComponent('/account')}`}>
+                        <Button size="sm" variant="secondary">
+                          Complete profile
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center gap-4 pb-6 border-b border-primary/10">
                   <Gravatar
                     email={user.email}
@@ -384,6 +418,12 @@ export default function AccountClient({ user }: AccountClientProps) {
                   <div>
                     <div className="font-medium text-foreground">{user.name || 'No name set'}</div>
                     <div className="text-sm text-muted-foreground">{user.email}</div>
+                    <div className="mt-1 text-sm text-muted-foreground">
+                      {(user as any).mobile ? (user as any).mobile : 'No mobile set'}{' '}
+                      <span className="text-xs">
+                        {(user as any).mobileVerified ? '(verified)' : '(not verified)'}
+                      </span>
+                    </div>
                     <div className="flex items-center gap-2 mt-2">
                       {userRoles.map((role) => (
                         <div

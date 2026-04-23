@@ -86,6 +86,12 @@ export default function EmailAuthForm() {
     defaultValues: { identifier: '', countryCode: '+27' },
   })
 
+  const identifierValue = form.watch('identifier')
+  const showCountryCode =
+    typeof identifierValue === 'string' &&
+    !isEmailIdentifier(identifierValue.trim()) &&
+    identifierValue.replace(/\D/g, '').length >= 4
+
   const handleIdentifier = async (values: IdentifierFormValues) => {
     const identifier = values.identifier.trim()
     const isEmail = isEmailIdentifier(identifier)
@@ -233,24 +239,30 @@ export default function EmailAuthForm() {
         <form onSubmit={form.handleSubmit(handleIdentifier)} className="grid gap-4">
           {error && <div className="bg-red-100 text-red-700 p-3 rounded-md">{error}</div>}
           <div className="grid gap-2">
-            <label
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              htmlFor="identifier"
-            >
-              Email or Mobile Number
-            </label>
+           
             <div className="flex gap-2">
-              <select
-                aria-label="Country code"
-                {...form.register('countryCode', { required: true })}
-                className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2"
-              >
-                <option value="+27">South Africa (+27)</option>
-              </select>
+              {showCountryCode && (
+                <select
+                  aria-label="Country code"
+                  {...form.register('countryCode', { required: true })}
+                  className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2"
+                >
+                  <option value="+27">South Africa (+27)</option>
+                  <option value="+1">United States / Canada (+1)</option>
+                  <option value="+44">United Kingdom (+44)</option>
+                  <option value="+49">Germany (+49)</option>
+                  <option value="+33">France (+33)</option>
+                  <option value="+34">Spain (+34)</option>
+                  <option value="+39">Italy (+39)</option>
+                  <option value="+31">Netherlands (+31)</option>
+                  <option value="+61">Australia (+61)</option>
+                  <option value="+353">Ireland (+353)</option>
+                </select>
+              )}
               <Input
                 id="identifier"
                 type="text"
-                placeholder="name@example.com or 82 123 4567"
+                placeholder="Phone number or email"
                 autoComplete="username"
                 autoCapitalize="none"
                 autoCorrect="off"
