@@ -86,6 +86,7 @@ export function PageAIAssistant({ context, placeholder, className, showActions =
   const [lastResponse, setLastResponse] = useState<string | null>(null)
   const [pendingPackagePreview, setPendingPackagePreview] = useState<any>(null)
   const [isSavingPackage, setIsSavingPackage] = useState(false)
+  const [isApprovingSuggestions, setIsApprovingSuggestions] = useState(false)
   const [createdPackageId, setCreatedPackageId] = useState<string | null>(null)
   const [restoredEstimate, setRestoredEstimate] = useState<any>(null)
   const estimateRestoredRef = useRef(false)
@@ -473,6 +474,76 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
       setIsSavingPackage(false)
     }
   }
+
+  const buildCreatePackageMessageFromSuggestion = useCallback(
+    (postId: string, suggestion: any) => {
+      const name = String(suggestion?.suggestedName || suggestion?.name || '📦 Package').trim()
+      const description = String(suggestion?.description || '').trim() || `Package created from catalog suggestion: ${name}`
+      const details = suggestion?.details || {}
+
+      const category = String(details?.category || suggestion?.category || 'standard') as any
+      const minNightsRaw = Number(details?.minNights ?? suggestion?.minNights ?? 1)
+      const maxNightsRaw = Number(details?.maxNights ?? suggestion?.maxNights ?? minNightsRaw ?? 1)
+      const minNights = Number.isFinite(minNightsRaw) ? Math.max(0.5, minNightsRaw) : 1
+      const maxNights = Number.isFinite(maxNightsRaw) ? Math.max(0.5, maxNightsRaw) : minNights
+
+      const multiplierRaw = Number(details?.multiplier ?? suggestion?.multiplier ?? 1)
+      const multiplier = Number.isFinite(multiplierRaw) ? multiplierRaw : 1
+
+      const baseRateRaw = suggestion?.baseRate
+      const baseRate = typeof baseRateRaw === 'number' && Number.isFinite(baseRateRaw) ? baseRateRaw : 0
+
+      const customerTierRequired = String(details?.customerTierRequired || 'standard').toLowerCase()
+      const entitlement = customerTierRequired.includes('pro') ? 'pro' : 'standard'
+
+      const features = Array.isArray(suggestion?.features)
+        ? suggestion.features
+        : typeof details?.features === 'string'
+          ? String(details.features)
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean)
+              .slice(0, 6)
+          : []
+
+      const revenueCatId = String(suggestion?.revenueCatId || '').trim()
+
+      return `Please create the package using createPackageTool with these details:
+- name: "${name}"
+- description: "${description}"
+- category: "${category}"
+- minNights: ${minNights}
+- maxNights: ${maxNights}
+- baseRate: ${baseRate}
+- multiplier: ${multiplier}
+- entitlement: "${entitlement}"
+- postId: "${postId}"
+- features: ${JSON.stringify(features)}
+${revenueCatId ? `- yocoId: "${revenueCatId}"\n- revenueCatId: "${revenueCatId}"` : ''}`
+    },
+    [],
+  )
+
+  const handleApproveCatalogSuggestions = useCallback(
+    async (postId: string, recs: any[]) => {
+      if (!isManageContext || !sendMessage) return
+      if (!postId || !Array.isArray(recs) || recs.length === 0) return
+
+      if (isApprovingSuggestions) return
+      setIsApprovingSuggestions(true)
+      try {
+        for (const rec of recs) {
+          const msg = buildCreatePackageMessageFromSuggestion(postId, rec)
+          await sendMessage({ text: msg })
+        }
+      } catch (e) {
+        console.error('Failed approving catalog suggestions:', e)
+      } finally {
+        setIsApprovingSuggestions(false)
+      }
+    },
+    [isApprovingSuggestions, isManageContext, sendMessage, buildCreatePackageMessageFromSuggestion],
+  )
 
   const handleCancelPackage = () => {
     setPendingPackagePreview(null)
@@ -985,7 +1056,32 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
                             </div>
                             {part.output.success && recs.length > 0 && (
                               <div className="rounded-lg border border-teal-200 bg-teal-50/60 p-4 text-sm">
-                                <p className="font-medium text-teal-900 mb-3">Starter package ideas</p>
+                                <div className="flex items-start justify-between gap-3 mb-3">
+                                  <p className="font-medium text-teal-900">Starter package ideas</p>
+                                  {part.output.post?.id && (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      disabled={chatIsLoading || isApprovingSuggestions}
+                                      onClick={() => void handleApproveCatalogSuggestions(String(part.output.post.id), recs)}
+                                      className="bg-white border-teal-200 text-xs"
+                                      title="Create all suggested packages for this listing"
+                                    >
+                                      {isApprovingSuggestions ? (
+                                        <>
+                                          <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                                          Approving…
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Package className="h-3 w-3 mr-1.5" />
+                                          Approve all
+                                        </>
+                                      )}
+                                    </Button>
+                                  )}
+                                </div>
                                 <ul className="space-y-3">
                                   {recs.map((r: any, i: number) => (
                                     <li key={i} className="rounded-md border bg-white p-3 shadow-sm">

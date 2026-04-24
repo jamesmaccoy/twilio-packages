@@ -34,6 +34,7 @@ function toISODateInputValue(d: Date) {
 }
 
 function diffNights(fromISO: string, toISO: string) {
+  if (fromISO && toISO && fromISO === toISO) return 0.5
   const from = new Date(fromISO)
   const to = new Date(toISO)
   if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return 0

@@ -208,7 +208,8 @@ export async function GET(
       const count = Number(product.periodCount) || 1
       switch (product.period) {
         case 'hour':
-          return 1
+          // Support sub-day offerings (e.g. 4 hours -> 0.5 nights minimum)
+          return Math.max(0.5, count / 24)
         case 'day':
           return count
         case 'week':
@@ -299,8 +300,8 @@ export async function GET(
             willPassEnabledFilter: pkg.isEnabled,
             willPassCategoryFilter: pkg.category !== 'addon' && (
               customerEntitlement === 'pro' || 
-              (customerEntitlement === 'none' && ['hosted', 'special'].includes(pkg.category)) ||
-              (customerEntitlement === 'standard' && ['standard', 'hosted', 'special'].includes(pkg.category))
+              (customerEntitlement === 'none' && ['hosted', 'special'].includes(String(pkg.category || ''))) ||
+              (customerEntitlement === 'standard' && ['standard', 'hosted', 'special'].includes(String(pkg.category || '')))
             )
           })
         }
@@ -315,7 +316,7 @@ export async function GET(
         // Filter packages based on customer entitlement (3-Tier System):
         // Tier 1: Non-subscribers (none) - Only see hosted/special packages (premium experience)
         if (customerEntitlement === 'none') {
-          const shouldInclude = ['hosted', 'special'].includes(pkg.category)
+          const shouldInclude = ['hosted', 'special'].includes(String(pkg.category || ''))
           if (pkg.id === '68a587e7420e4517de8d2b2d') {
             console.log('🔍 Package entitlement check (none):', {
               packageId: pkg.id,
@@ -329,7 +330,7 @@ export async function GET(
         
         // Tier 2: Standard subscribers - See standard + hosted + special (better than non-subscribers)
         if (customerEntitlement === 'standard') {
-          return ['standard', 'hosted', 'special'].includes(pkg.category)
+          return ['standard', 'hosted', 'special'].includes(String(pkg.category || ''))
         }
         
         // Tier 3: Pro subscribers - See everything (all packages)
