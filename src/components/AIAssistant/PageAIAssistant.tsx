@@ -985,6 +985,8 @@ ${revenueCatId ? `- yocoId: "${revenueCatId}"\n- revenueCatId: "${revenueCatId}"
                           const recs = Array.isArray(part.output?.recommendations)
                             ? part.output.recommendations
                             : []
+                          const postIdForSuggestions =
+                            String(part.output?.postId || context?.data?.postId || '').trim()
                           return (
                             <div
                               key={index}
@@ -993,6 +995,31 @@ ${revenueCatId ? `- yocoId: "${revenueCatId}"\n- revenueCatId: "${revenueCatId}"
                               <p className="font-medium text-teal-900 mb-3">
                                 {part.output?.message || 'Catalog package ideas'}
                               </p>
+                              {recs.length > 0 && postIdForSuggestions && (
+                                <div className="flex justify-end mb-3">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={chatIsLoading || isApprovingSuggestions}
+                                    onClick={() => void handleApproveCatalogSuggestions(postIdForSuggestions, recs)}
+                                    className="bg-white border-teal-200 text-xs"
+                                    title="Create all suggested packages for this listing"
+                                  >
+                                    {isApprovingSuggestions ? (
+                                      <>
+                                        <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                                        Approving…
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Package className="h-3 w-3 mr-1.5" />
+                                        Approve all
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+                              )}
                               {recs.length === 0 ? (
                                 <p className="text-xs text-slate-600">No recommendations returned.</p>
                               ) : (
@@ -1668,7 +1695,16 @@ ${revenueCatId ? `- yocoId: "${revenueCatId}"\n- revenueCatId: "${revenueCatId}"
             </button>
             <button
               type="button"
-              onClick={() => handleActionClick('Create a new package for my property')}
+              onClick={() => {
+                const pid = String(context?.data?.postId || '').trim()
+                if (!pid) {
+                  handleActionClick('Create a new package for my property')
+                  return
+                }
+                handleActionClick(
+                  `Suggest 1–4 packages for postId "${pid}" using suggestCatalogPackages tool. Include sub-day options where relevant (e.g. 4 hours -> 0.5 nights). Then let me approve them.`,
+                )
+              }}
               disabled={chatIsLoading}
               className="text-sm font-medium leading-5 text-[#475569] bg-white cursor-pointer flex items-center gap-2 shadow-[0_0_0_0_transparent,0_0_0_0_transparent,0_1px_2px_0_rgba(0,0,0,0.05)] transition-all duration-200 border border-[#e2e8f0] rounded-full px-4 py-2 hover:bg-[#f8fafc] hover:border-[#cbd5e1] disabled:opacity-50 disabled:cursor-not-allowed"
             >

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -86,7 +86,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
     }
   }
 
-  const loadPackages = async () => {
+  const loadPackages = useCallback(async () => {
     if (!postId) return;
     setLoading(true);
     setError(null);
@@ -144,7 +144,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
     } finally {
       setLoading(false);
     }
-  };
+  }, [postId]);
 
   // Auto-open onboarding when the parent asks for it (e.g. after creating a new property)
   useEffect(() => {
@@ -235,6 +235,20 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
     loadPackages();
     loadAvailableProducts();
   }, [postId]);
+
+  // Hot-reload packages when the AI creates a package in another component.
+  useEffect(() => {
+    const onPackageCreated = (event: Event) => {
+      const detail = (event as CustomEvent<any>)?.detail
+      const eventPostId = String(detail?.postId || '').trim()
+      if (!eventPostId || eventPostId !== String(postId)) return
+      void loadPackages()
+    }
+    window.addEventListener('packageCreated', onPackageCreated as EventListener)
+    return () => {
+      window.removeEventListener('packageCreated', onPackageCreated as EventListener)
+    }
+  }, [loadPackages, postId]);
 
   const handleToggle = (id: string) => {
     setPackages(pkgs =>
