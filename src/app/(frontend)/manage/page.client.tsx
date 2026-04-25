@@ -48,6 +48,29 @@ export default function ManagePageClient({ posts, latestEstimatePostId }: Manage
       return postsState[0]?.id ?? null
     })
   }, [postsState])
+
+  // New listing created from assistant → add to sidebar immediately and select it.
+  useEffect(() => {
+    const handlePostCreated = (event: Event) => {
+      const detail = (event as CustomEvent<any>)?.detail
+      const newPost = detail?.post
+      const newId = String(detail?.postId || newPost?.id || '').trim()
+      if (!newId) return
+
+      setPostsState((prev) => {
+        if (prev.some((p) => p.id === newId)) return prev
+        const normalized: Post = {
+          ...(newPost || {}),
+          id: newId,
+        }
+        return [normalized, ...prev]
+      })
+      setSelectedPostId(newId)
+    }
+
+    window.addEventListener('postCreated', handlePostCreated as EventListener)
+    return () => window.removeEventListener('postCreated', handlePostCreated as EventListener)
+  }, [])
   const [activeTab, setActiveTab] = useState<'packages' | 'statement'>('packages')
   const [mobileView, setMobileView] = useState<'dashboard' | 'assistant'>('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)

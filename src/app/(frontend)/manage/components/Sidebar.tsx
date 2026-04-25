@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   Building2,
@@ -53,9 +53,14 @@ export function Sidebar({
   onMobileOpenChange,
 }: SidebarProps) {
   const [mobileOpenUncontrolled, setMobileOpenUncontrolled] = useState(false)
+  const [recentlyUpdatedPropertyId, setRecentlyUpdatedPropertyId] = useState<string | null>(null)
   const mobileOpen =
     mobileOpenControlled !== undefined ? mobileOpenControlled : mobileOpenUncontrolled
   const setMobileOpen = onMobileOpenChange ?? setMobileOpenUncontrolled
+
+  const updatedPropertyId = useMemo(() => {
+    return recentlyUpdatedPropertyId || null
+  }, [recentlyUpdatedPropertyId])
 
   useEffect(() => {
     if (!mobileOpen) return
@@ -87,6 +92,36 @@ export function Sidebar({
     mq.addEventListener('change', onChange)
     return () => mq.removeEventListener('change', onChange)
   }, [setMobileOpen])
+
+  // When packages are created/approved, briefly highlight the property in the sidebar.
+  useEffect(() => {
+    const markUpdated = (postId: string | null) => {
+      if (!postId) return
+      setRecentlyUpdatedPropertyId(postId)
+      window.setTimeout(() => {
+        setRecentlyUpdatedPropertyId((cur) => (cur === postId ? null : cur))
+      }, 2500)
+    }
+
+    const onPackageCreated = (event: Event) => {
+      const detail = (event as CustomEvent<any>)?.detail
+      const postId = String(detail?.postId || '').trim()
+      markUpdated(postId)
+    }
+
+    const onPackagesApproved = (event: Event) => {
+      const detail = (event as CustomEvent<any>)?.detail
+      const postId = String(detail?.postId || '').trim()
+      markUpdated(postId)
+    }
+
+    window.addEventListener('packageCreated', onPackageCreated as EventListener)
+    window.addEventListener('packagesApproved', onPackagesApproved as EventListener)
+    return () => {
+      window.removeEventListener('packageCreated', onPackageCreated as EventListener)
+      window.removeEventListener('packagesApproved', onPackagesApproved as EventListener)
+    }
+  }, [])
 
   const closeMobile = () => setMobileOpen(false)
 
@@ -205,6 +240,7 @@ export function Sidebar({
               properties.map((property, index) => {
                 const isActive = activeProperty === property.id
                 const PropertyIcon = getPropertyIcon(index)
+                const isUpdated = updatedPropertyId === property.id
                 return (
                   <button
                     key={property.id}
@@ -225,7 +261,12 @@ export function Sidebar({
                         isActive ? "text-teal-500" : "text-slate-400"
                       )}
                     />
-                    <span className="truncate">{property.title}</span>
+                    <span className="truncate flex-1 text-left">{property.title}</span>
+                    {isUpdated ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
+                        Updated
+                      </span>
+                    ) : null}
                   </button>
                 )
               })
