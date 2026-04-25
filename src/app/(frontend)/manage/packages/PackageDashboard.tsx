@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -101,6 +101,13 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
   const [onboardingExistingPackageId, setOnboardingExistingPackageId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const activePackagesRef = useRef<HTMLDivElement | null>(null)
+
+  const scrollToActivePackages = useCallback(() => {
+    const el = activePackagesRef.current
+    if (!el) return
+    el.scrollIntoView({ behavior: "smooth", block: "start" })
+  }, [])
 
   const handleDeletePackage = async (pkg: { id: string; name?: string }) => {
     if (!pkg?.id) return
@@ -338,6 +345,9 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
         return Array.from(byId.values())
       })
 
+      setSuccess(`Saved ${created.length} package${created.length === 1 ? '' : 's'} to this property.`)
+      scrollToActivePackages()
+
       // Background reconcile.
       void loadPackages()
     }
@@ -347,6 +357,13 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
       window.removeEventListener('packagesApproved', onPackagesApproved as EventListener)
     }
   }, [loadPackages, postId])
+
+  // Auto-clear success toast after a moment.
+  useEffect(() => {
+    if (!success) return
+    const t = setTimeout(() => setSuccess(null), 3500)
+    return () => clearTimeout(t)
+  }, [success])
 
   const handleToggle = (id: string) => {
     setPackages(pkgs =>
@@ -664,7 +681,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
         {/* Main Content Area */}
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-slate-900">
+            <h2 ref={activePackagesRef} className="text-xl font-semibold text-slate-900">
               Active Packages
             </h2>
             <span className="text-sm text-slate-500">
