@@ -6,6 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
 import { Loader2, RefreshCw, AlertCircle, Sparkles, Check, Star, Crown, Package, TrendingUp, DollarSign, Calendar, CheckCircle, Users, Clock, MoreHorizontal, Bot } from "lucide-react";
 import { PackageOnboarding } from "@/components/PackageOnboarding/PackageOnboarding";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -47,6 +48,44 @@ interface PackageDashboardProps {
   postId: string;
   /** If true, open the AI package onboarding immediately (create flow) */
   startOnboarding?: boolean;
+}
+
+type DurationOption = { label: string; days: number }
+const DURATION_OPTIONS: DurationOption[] = [
+  { label: "4 hours", days: 4 / 24 },
+  { label: "1 day", days: 1 },
+  { label: "2 days", days: 2 },
+  { label: "3 days", days: 3 },
+  { label: "4 days", days: 4 },
+  { label: "5 days", days: 5 },
+  { label: "7 days", days: 7 },
+  { label: "14 days", days: 14 },
+  { label: "21 days", days: 21 },
+  { label: "30 days", days: 30 },
+]
+
+function formatDurationLabel(days: number) {
+  if (typeof days !== "number" || Number.isNaN(days)) return "—"
+  if (days < 1) {
+    const hours = Math.round(days * 24)
+    return `${hours} hours`
+  }
+  const wholeDays = Math.round(days)
+  return `${wholeDays} ${wholeDays === 1 ? "day" : "days"}`
+}
+
+function getClosestDurationIndex(days: number) {
+  if (typeof days !== "number" || Number.isNaN(days)) return 1
+  let bestIdx = 0
+  let bestDistance = Number.POSITIVE_INFINITY
+  for (let i = 0; i < DURATION_OPTIONS.length; i++) {
+    const d = Math.abs(DURATION_OPTIONS[i]!.days - days)
+    if (d < bestDistance) {
+      bestDistance = d
+      bestIdx = i
+    }
+  }
+  return bestIdx
 }
 
 export default function PackageDashboard({ postId, startOnboarding }: PackageDashboardProps) {
@@ -600,7 +639,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-2 gap-6">
               {packages.map((pkg) => (
                 <div
                   key={pkg.id}
@@ -646,7 +685,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
                       <div className="flex items-center text-slate-600">
                         <Clock className="w-4 h-4 mr-2 text-slate-400" />
                         <span>
-                          {pkg.minNights}-{pkg.maxNights} nights
+                          {formatDurationLabel(pkg.minNights)}–{formatDurationLabel(pkg.maxNights)}
                         </span>
                       </div>
                       <div className="flex items-center text-slate-600">
@@ -763,25 +802,33 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
                                   </Select>
                                 </div>
                               </div>
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <label className="text-sm font-medium text-gray-600">Min Nights</label>
-                                  <Input
-                                    type="number"
-                                    min="1"
-                                    value={editingPackage.minNights || 1}
-                                    onChange={e => setEditingPackage({ ...editingPackage, minNights: parseInt(e.target.value) || 1 })}
-                                    className="mt-1"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-sm font-medium text-gray-600">Max Nights</label>
-                                  <Input
-                                    type="number"
-                                    min="1"
-                                    value={editingPackage.maxNights || 7}
-                                    onChange={e => setEditingPackage({ ...editingPackage, maxNights: parseInt(e.target.value) || 7 })}
-                                    className="mt-1"
+                              <div>
+                                <label className="text-sm font-medium text-gray-600">Duration Range</label>
+                                <div className="mt-2 space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs text-slate-500">Hourly (4h)</span>
+                                    <span className="text-xs font-medium text-slate-700">
+                                      {formatDurationLabel(editingPackage.minNights ?? 1)}–{formatDurationLabel(editingPackage.maxNights ?? 7)}
+                                    </span>
+                                    <span className="text-xs text-slate-500">Monthly (30d)</span>
+                                  </div>
+                                  <Slider
+                                    min={0}
+                                    max={DURATION_OPTIONS.length - 1}
+                                    step={1}
+                                    value={[
+                                      getClosestDurationIndex(editingPackage.minNights ?? 1),
+                                      getClosestDurationIndex(editingPackage.maxNights ?? 7),
+                                    ]}
+                                    onValueChange={(v) => {
+                                      const aIdx = v?.[0] ?? 1
+                                      const bIdx = v?.[1] ?? Math.max(aIdx, 6)
+                                      const minIdx = Math.min(aIdx, bIdx)
+                                      const maxIdx = Math.max(aIdx, bIdx)
+                                      const nextMin = DURATION_OPTIONS[minIdx]?.days ?? 1
+                                      const nextMax = DURATION_OPTIONS[maxIdx]?.days ?? 7
+                                      setEditingPackage({ ...editingPackage, minNights: nextMin, maxNights: nextMax })
+                                    }}
                                   />
                                 </div>
                               </div>
