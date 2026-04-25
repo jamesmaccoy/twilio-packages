@@ -3,7 +3,8 @@ import { redirect } from 'next/navigation'
 import { getPayload } from 'payload'
 import configPromise from '@/payload.config'
 import type { Post } from '@/payload-types'
-import ManagePackagesForPost from './page.client'
+import PackageDashboard from '../PackageDashboard'
+import { PageAIAssistant } from '@/components/AIAssistant/PageAIAssistant'
 
 interface Props {
   params: Promise<{ postId: string }>
@@ -37,5 +38,22 @@ export default async function ManagePackagesForPostPage({ params }: Props) {
     // non-fatal: assistant still works with current postId only
   }
 
-  return <ManagePackagesForPost postId={postId} posts={posts} />
+  return (
+    <div className="container py-10 max-w-7xl">
+      <PageAIAssistant
+        variant="primary"
+        context={{
+          type: 'manage',
+          data: {
+            posts,
+            postId,
+          },
+        }}
+      />
+
+      <div className="mt-10">
+        <PackageDashboard postId={postId} />
+      </div>
+    </div>
+  )
 } 

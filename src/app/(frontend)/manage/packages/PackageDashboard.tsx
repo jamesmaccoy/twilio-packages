@@ -238,15 +238,21 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
 
   // Hot-reload packages when the AI creates a package in another component.
   useEffect(() => {
+    let t: any = null
     const onPackageCreated = (event: Event) => {
       const detail = (event as CustomEvent<any>)?.detail
       const eventPostId = String(detail?.postId || '').trim()
       if (!eventPostId || eventPostId !== String(postId)) return
-      void loadPackages()
+      // Debounce so "Approve all" doesn't trigger N reloads.
+      if (t) clearTimeout(t)
+      t = setTimeout(() => {
+        void loadPackages()
+      }, 400)
     }
     window.addEventListener('packageCreated', onPackageCreated as EventListener)
     return () => {
       window.removeEventListener('packageCreated', onPackageCreated as EventListener)
+      if (t) clearTimeout(t)
     }
   }, [loadPackages, postId]);
 
@@ -902,7 +908,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
                   <Package className="w-6 h-6 text-slate-400 group-hover:text-slate-600" />
                 </div>
                 <h3 className="text-lg font-medium text-slate-900 mb-1">
-                  Create New Package
+                  Create New Packagess
                 </h3>
                 <p className="text-sm text-slate-500 max-w-[200px]">
                   Describe your package and let AI generate the details.
