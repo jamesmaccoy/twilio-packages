@@ -278,11 +278,18 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
   // Hot-reload packages when the AI creates a package in another component.
   useEffect(() => {
     let t: any = null
+    let lastImmediate = 0
     const onPackageCreated = (event: Event) => {
       const detail = (event as CustomEvent<any>)?.detail
       const eventPostId = String(detail?.postId || '').trim()
       if (!eventPostId || eventPostId !== String(postId)) return
-      // Debounce so "Approve all" doesn't trigger N reloads.
+      // Immediate refresh so the new package appears right away,
+      // plus a debounced follow-up to catch any lagging writes.
+      const now = Date.now()
+      if (now - lastImmediate > 250) {
+        lastImmediate = now
+        void loadPackages()
+      }
       if (t) clearTimeout(t)
       t = setTimeout(() => {
         void loadPackages()

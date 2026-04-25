@@ -508,7 +508,12 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
 
       const revenueCatId = String(suggestion?.revenueCatId || '').trim()
 
-      return `Please create the package using createPackageTool with these details:
+      // The manage chat system prompt forces preview-first whenever "create" is involved.
+      // So for "Approve all" we explicitly request preview with the exact starter copy,
+      // then create with the exact same values (no rewriting).
+      return `Use the starter package idea EXACTLY as written (do not rewrite the copy).
+
+1) Call previewPackageTool NOW with these exact details:
 - name: "${name}"
 - description: "${description}"
 - category: "${category}"
@@ -519,7 +524,9 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
 - entitlement: "${entitlement}"
 - postId: "${postId}"
 - features: ${JSON.stringify(features)}
-${revenueCatId ? `- yocoId: "${revenueCatId}"\n- revenueCatId: "${revenueCatId}"` : ''}`
+${revenueCatId ? `- yocoId: "${revenueCatId}"\n- revenueCatId: "${revenueCatId}"` : ''}
+
+2) Then call createPackageTool with the exact same values (no changes).`
     },
     [],
   )
