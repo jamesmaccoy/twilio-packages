@@ -795,10 +795,22 @@ export async function POST(request: NextRequest) {
       // @ts-expect-error - AI SDK type inference issue
       execute: async (input: any) => {
         try {
-          const { title, description, baseRate, featured, metaTitle, metaDescription } = input
+          const { title: titleRaw, description, baseRate, featured, metaTitle, metaDescription } = input
+
+          const title = typeof titleRaw === 'string' ? titleRaw.trim() : ''
+          if (!title) {
+            return {
+              success: false,
+              error: 'Title is required',
+              message: 'Failed to create property: Title is required',
+            }
+          }
 
           // Generate description if not provided
-          const postDescription = description || `A beautiful ${title.toLowerCase()} property available for booking.`
+          const postDescription =
+            (typeof description === 'string' && description.trim().length > 0
+              ? description.trim()
+              : `A beautiful ${title.toLowerCase()} property available for booking.`)
 
           // Create minimal content structure for Lexical editor
           const content = {
