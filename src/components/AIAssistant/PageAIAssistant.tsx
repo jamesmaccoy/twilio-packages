@@ -25,7 +25,7 @@ const MANAGE_NEW_LISTING_PROMPT = `Create a new listing for my property.
 Title: My guest stay (edit this title)
 Description: Brief guest-facing summary — space, location, amenities, and who it is for. (edit this paragraph)
 
-Please use createPostTool with the title and description above, then help me choose packages for this listing.`
+Now suggest a few packages for this listing.`
 
 interface PageAIAssistantProps {
   context?: {
@@ -1670,7 +1670,7 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
                   return
                 }
                 handleActionClick(
-                  `Suggest 1–4 packages for postId "${pid}" using suggestCatalogPackages tool. Include sub-day options where relevant (e.g. 4 hours -> 0.5 nights). Then let me approve them.`,
+                  `Suggest 1–4 starter package ideas for my existing property (postId "${pid}"). Include sub-day options where relevant (e.g. 4 hours -> 0.5 nights). Then let me approve them.`,
                 )
               }}
               disabled={chatIsLoading}
