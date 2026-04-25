@@ -302,6 +302,52 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
     }
   }, [loadPackages, postId]);
 
+  // Optimistically insert approved suggestions immediately (no refresh needed).
+  useEffect(() => {
+    const onPackagesApproved = (event: Event) => {
+      const detail = (event as CustomEvent<any>)?.detail
+      const eventPostId = String(detail?.postId || '').trim()
+      if (!eventPostId || eventPostId !== String(postId)) return
+      const created = Array.isArray(detail?.created) ? detail.created : []
+      if (created.length === 0) return
+
+      setPackages((prev) => {
+        const byId = new Map(prev.map((p) => [p.id, p]))
+        for (const doc of created) {
+          const id = String(doc?.id || '').trim()
+          if (!id) continue
+          const features = Array.isArray(doc?.features)
+            ? doc.features.map((f: any) => (typeof f === 'string' ? f : f?.feature)).filter(Boolean)
+            : []
+          byId.set(id, {
+            id,
+            name: String(doc?.name || 'Package'),
+            description: String(doc?.description || ''),
+            isEnabled: Boolean(doc?.isEnabled ?? true),
+            customName: undefined,
+            minNights: Number(doc?.minNights ?? 1),
+            maxNights: Number(doc?.maxNights ?? 1),
+            revenueCatId: typeof doc?.revenueCatId === 'string' ? doc.revenueCatId : undefined,
+            baseRate: typeof doc?.baseRate === 'number' ? doc.baseRate : undefined,
+            category: (doc?.category || 'standard') as any,
+            multiplier: typeof doc?.multiplier === 'number' ? doc.multiplier : 1,
+            features,
+            entitlement: (doc?.entitlement || 'standard') as any,
+          })
+        }
+        return Array.from(byId.values())
+      })
+
+      // Background reconcile.
+      void loadPackages()
+    }
+
+    window.addEventListener('packagesApproved', onPackagesApproved as EventListener)
+    return () => {
+      window.removeEventListener('packagesApproved', onPackagesApproved as EventListener)
+    }
+  }, [loadPackages, postId])
+
   const handleToggle = (id: string) => {
     setPackages(pkgs =>
       pkgs.map(pkg =>

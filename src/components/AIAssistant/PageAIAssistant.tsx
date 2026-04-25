@@ -475,81 +475,42 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
     }
   }
 
-  const buildCreatePackageMessageFromSuggestion = useCallback(
-    (postId: string, suggestion: any) => {
-      const name = String(suggestion?.suggestedName || suggestion?.name || '📦 Package').trim()
-      const description = String(suggestion?.description || '').trim() || `Package created from catalog suggestion: ${name}`
-      const details = suggestion?.details || {}
-
-      const category = String(details?.category || suggestion?.category || 'standard') as any
-      const minNightsRaw = Number(details?.minNights ?? suggestion?.minNights ?? 1)
-      const maxNightsRaw = Number(details?.maxNights ?? suggestion?.maxNights ?? minNightsRaw ?? 1)
-      const minNights = Number.isFinite(minNightsRaw) ? Math.max(0.5, minNightsRaw) : 1
-      const maxNights = Number.isFinite(maxNightsRaw) ? Math.max(0.5, maxNightsRaw) : minNights
-
-      const multiplierRaw = Number(details?.multiplier ?? suggestion?.multiplier ?? 1)
-      const multiplier = Number.isFinite(multiplierRaw) ? multiplierRaw : 1
-
-      const baseRateRaw = suggestion?.baseRate
-      const baseRate = typeof baseRateRaw === 'number' && Number.isFinite(baseRateRaw) ? baseRateRaw : 0
-
-      const customerTierRequired = String(details?.customerTierRequired || 'standard').toLowerCase()
-      const entitlement = customerTierRequired.includes('pro') ? 'pro' : 'standard'
-
-      const features = Array.isArray(suggestion?.features)
-        ? suggestion.features
-        : typeof details?.features === 'string'
-          ? String(details.features)
-              .split(',')
-              .map((s) => s.trim())
-              .filter(Boolean)
-              .slice(0, 6)
-          : []
-
-      const revenueCatId = String(suggestion?.revenueCatId || '').trim()
-
-      // The manage chat system prompt forces preview-first whenever "create" is involved.
-      // So for "Approve all" we explicitly request preview with the exact starter copy,
-      // then create with the exact same values (no rewriting).
-      return `Use the starter package idea EXACTLY as written (do not rewrite the copy).
-
-1) Call previewPackageTool NOW with these exact details:
-- name: "${name}"
-- description: "${description}"
-- category: "${category}"
-- minNights: ${minNights}
-- maxNights: ${maxNights}
-- baseRate: ${baseRate}
-- multiplier: ${multiplier}
-- entitlement: "${entitlement}"
-- postId: "${postId}"
-- features: ${JSON.stringify(features)}
-${revenueCatId ? `- yocoId: "${revenueCatId}"\n- revenueCatId: "${revenueCatId}"` : ''}
-
-2) Then call createPackageTool with the exact same values (no changes).`
-    },
-    [],
-  )
+  // NOTE: Previously "Approve all" used chat tool-calls (preview/create) which spammed the thread.
+  // We now persist suggestions via `/api/packages/approve-suggestions` so this helper is unused.
 
   const handleApproveCatalogSuggestions = useCallback(
     async (postId: string, recs: any[]) => {
-      if (!isManageContext || !sendMessage) return
+      if (!isManageContext) return
       if (!postId || !Array.isArray(recs) || recs.length === 0) return
 
       if (isApprovingSuggestions) return
       setIsApprovingSuggestions(true)
       try {
-        for (const rec of recs) {
-          const msg = buildCreatePackageMessageFromSuggestion(postId, rec)
-          await sendMessage({ text: msg })
+        const res = await fetch('/api/packages/approve-suggestions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ postId, suggestions: recs }),
+        })
+        if (!res.ok) {
+          const data = await res.json().catch(() => null)
+          throw new Error(data?.error || `Failed (HTTP ${res.status})`)
         }
+
+        const data = await res.json()
+        const created = Array.isArray(data?.created) ? data.created : []
+        window.dispatchEvent(
+          new CustomEvent('packagesApproved', {
+            detail: { postId, created },
+          }),
+        )
       } catch (e) {
         console.error('Failed approving catalog suggestions:', e)
       } finally {
         setIsApprovingSuggestions(false)
       }
     },
-    [isApprovingSuggestions, isManageContext, sendMessage, buildCreatePackageMessageFromSuggestion],
+    [isApprovingSuggestions, isManageContext],
   )
 
   const handleCancelPackage = () => {
