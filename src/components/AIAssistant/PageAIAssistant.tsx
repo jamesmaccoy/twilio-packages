@@ -1460,18 +1460,18 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
       <div className={cn("w-full", className)}>
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center mb-4 bg-[#f0fdfa] shadow-[0_0_0_0_#fff,0_0_0_1px_#ccfbf1,0_0_0_0_transparent] rounded-full px-2 py-2">
+          <div className="inline-flex items-center justify-center mb-4 bg-[#f0fdfa] dark:bg-teal-950/40 shadow-[0_0_0_0_#fff,0_0_0_1px_#ccfbf1,0_0_0_0_transparent] dark:shadow-none rounded-full px-2 py-2">
             <Sparkles className="mr-2 h-5 w-5 text-[#0d9488]" />
-            <span className="text-sm leading-5 font-medium text-[#134e4a]">
+            <span className="text-sm leading-5 font-medium text-[#134e4a] dark:text-teal-100">
               AI Assistant
             </span>
           </div>
-          <h1 className="text-2xl sm:text-[30px] font-bold leading-tight sm:leading-9 tracking-[-0.75px] text-[#0f172a] mb-3">
+          <h1 className="text-2xl sm:text-[30px] font-bold leading-tight sm:leading-9 tracking-[-0.75px] text-[#0f172a] dark:text-foreground mb-3">
             {isBookingsContext
               ? "How can I help with your bookings today?"
               : "How can I help manage your properties today?"}
           </h1>
-          <p className="text-base sm:text-lg leading-6 sm:leading-7 text-[#64748b] m-0">
+          <p className="text-base sm:text-lg leading-6 sm:leading-7 text-[#64748b] dark:text-muted-foreground m-0">
             {isBookingsContext
               ? "Ask about your upcoming trips, view booking details, or get recommendations."
               : "Generate packages, analyze pricing, or get insights instantly."}
@@ -1507,15 +1507,15 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
 
           {/* Render simple response for bookings context */}
           {isBookingsContext && lastResponse && (
-            <div className="rounded-lg border border-slate-200 bg-white p-6 mb-6 shadow-sm">
+            <div className="rounded-lg border border-slate-200 dark:border-border bg-white dark:bg-card p-6 mb-6 shadow-sm">
               <div className="flex gap-3">
                 <div className="flex-shrink-0">
-                  <div className="h-8 w-8 rounded-full bg-teal-50 flex items-center justify-center">
+                  <div className="h-8 w-8 rounded-full bg-teal-50 dark:bg-teal-950/40 flex items-center justify-center">
                     <Sparkles className="h-4 w-4 text-teal-600" />
                   </div>
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-slate-900 leading-relaxed whitespace-pre-line">
+                  <p className="text-sm text-slate-900 dark:text-foreground leading-relaxed whitespace-pre-line">
                     {lastResponse}
                   </p>
                 </div>
@@ -1525,43 +1525,43 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
 
           {/* Empty state placeholder */}
           {isManageContext && (!messages || messages.length === 0) && (
-            <div className="py-4 text-center text-sm leading-5 text-[#64748b]">
+            <div className="py-4 text-center text-sm leading-5 text-[#64748b] dark:text-muted-foreground">
               Start a conversation to see messages here...
             </div>
           )}
 
           {/* Empty state for bookings context */}
           {isBookingsContext && !lastResponse && !restoredEstimate && (
-            <div className="py-4 text-center text-sm leading-5 text-[#64748b]">
+            <div className="py-4 text-center text-sm leading-5 text-[#64748b] dark:text-muted-foreground">
               Start a conversation to see messages here...
             </div>
           )}
 
           {/* Show restored estimate details */}
           {isBookingsContext && restoredEstimate && (
-            <div className="mb-6 rounded-lg border border-teal-200 bg-teal-50/30 p-4">
+            <div className="mb-6 rounded-lg border border-teal-200 dark:border-teal-900/60 bg-teal-50/30 dark:bg-teal-950/30 p-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0">
-                  <div className="h-8 w-8 rounded-full bg-teal-100 flex items-center justify-center">
+                  <div className="h-8 w-8 rounded-full bg-teal-100 dark:bg-teal-950/40 flex items-center justify-center">
                     <Calendar className="h-4 w-4 text-teal-600" />
                   </div>
                 </div>
                 <div className="flex-1">
-                  <h4 className="text-sm font-semibold text-slate-900 mb-1">Restored Estimate</h4>
+                  <h4 className="text-sm font-semibold text-slate-900 dark:text-foreground mb-1">Restored Estimate</h4>
                   {restoredEstimate.fromDate && restoredEstimate.toDate && (
-                    <p className="text-xs text-slate-600 mb-2">
+                    <p className="text-xs text-slate-600 dark:text-muted-foreground mb-2">
                       {new Date(restoredEstimate.fromDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - {new Date(restoredEstimate.toDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </p>
                   )}
                   {restoredEstimate.total && (
-                    <p className="text-sm font-bold text-teal-700">
+                    <p className="text-sm font-bold text-teal-700 dark:text-teal-200">
                       R{Number(restoredEstimate.total).toFixed(0)}
                     </p>
                   )}
                   {typeof restoredEstimate.post === 'object' && restoredEstimate.post?.slug && (
                     <a
                       href={`/posts/${restoredEstimate.post.slug}?restoreEstimate=${restoredEstimate.id}`}
-                      className="text-xs text-teal-600 hover:text-teal-700 underline mt-2 inline-block"
+                      className="text-xs text-teal-700 dark:text-teal-200 hover:text-teal-700 underline mt-2 inline-block"
                     >
                       View on property page →
                     </a>
@@ -1642,12 +1642,12 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
           <div className={cn(
             "rounded-lg border p-3 text-sm mb-6",
             mcpTestResult.includes('✅')
-              ? "bg-green-50 text-green-800 border-green-200"
-              : "bg-red-50 text-red-800 border-red-200"
+              ? "bg-green-50 text-green-800 border-green-200 dark:bg-green-950/30 dark:text-green-200 dark:border-green-900/50"
+              : "bg-red-50 text-red-800 border-red-200 dark:bg-red-950/30 dark:text-red-200 dark:border-red-900/50"
           )}>
             <div className="whitespace-pre-line">{mcpTestResult}</div>
             {mcpTestResult.includes('No API keys found') && (
-              <div className="mt-3 pt-3 border-t border-red-200">
+              <div className="mt-3 pt-3 border-t border-red-200 dark:border-red-900/50">
                 <a
                   href="/admin/collections/payload-mcp-api-keys/create"
                   target="_blank"
@@ -1663,7 +1663,7 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
         )}
 
         {/* Input Area */}
-        <div className="mb-6 bg-white shadow-[0_0_0_0_transparent,0_0_0_0_transparent,0_1px_2px_0_rgba(0,0,0,0.05)] transition-shadow duration-300 border border-[#e2e8f0] rounded-2xl p-2">
+        <div className="mb-6 bg-white dark:bg-card shadow-[0_0_0_0_transparent,0_0_0_0_transparent,0_1px_2px_0_rgba(0,0,0,0.05)] transition-shadow duration-300 border border-[#e2e8f0] dark:border-border rounded-2xl p-2">
           <form onSubmit={handleSendMessage}>
             <textarea
               ref={textareaRef}
@@ -1673,7 +1673,7 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
               placeholder={placeholder || (isBookingsContext
                 ? "Ask about your bookings, upcoming trips, or get recommendations..."
                 : "Describe a new package for your property or ask about recent bookings...")}
-              className="w-full min-h-[120px] resize-none bg-transparent outline-none border-0 p-4 text-base font-normal leading-6 text-[#0f172a] placeholder:text-[#94a3b8]"
+              className="w-full min-h-[120px] resize-none bg-transparent outline-none border-0 p-4 text-base font-normal leading-6 text-[#0f172a] dark:text-foreground placeholder:text-[#94a3b8] dark:placeholder:text-muted-foreground"
               disabled={currentIsLoading}
             />
             <div className="flex items-center justify-between px-2 pb-2">
@@ -1684,7 +1684,7 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
                       type="button"
                       onClick={handleTestMCP}
                       disabled={testingMCP}
-                      className="text-[#94a3b8] bg-transparent cursor-pointer transition-colors duration-150 border-0 rounded-full p-2 hover:text-[#64748b]"
+                      className="text-[#94a3b8] dark:text-muted-foreground bg-transparent cursor-pointer transition-colors duration-150 border-0 rounded-full p-2 hover:text-[#64748b] dark:hover:text-foreground"
                       title="Test MCP endpoint"
                     >
                       {testingMCP ? (
@@ -1699,7 +1699,7 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
                   type="button"
                   onClick={isListening ? stopListening : startListening}
                   className={cn(
-                    "text-[#94a3b8] bg-transparent cursor-pointer transition-colors duration-150 border-0 rounded-full p-2 hover:text-[#64748b]",
+                    "text-[#94a3b8] dark:text-muted-foreground bg-transparent cursor-pointer transition-colors duration-150 border-0 rounded-full p-2 hover:text-[#64748b] dark:hover:text-foreground",
                     isListening && "text-red-500 hover:text-red-600"
                   )}
                 >
@@ -1709,7 +1709,7 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
               <button
                 type="submit"
                 disabled={!currentInput.trim() || currentIsLoading}
-                className="text-sm font-medium leading-5 text-white bg-[#0f172a] cursor-pointer flex items-center gap-2 transition-colors duration-150 border-0 rounded-full px-4 py-2 hover:bg-[#1e293b] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="text-sm font-medium leading-5 text-white bg-[#0f172a] dark:bg-zinc-100 dark:text-zinc-900 cursor-pointer flex items-center gap-2 transition-colors duration-150 border-0 rounded-full px-4 py-2 hover:bg-[#1e293b] dark:hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {currentIsLoading ? (
                   <>
@@ -1734,7 +1734,7 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
               type="button"
               onClick={() => applyManageQuickPrompt(MANAGE_NEW_LISTING_PROMPT)}
               disabled={chatIsLoading}
-              className="text-sm font-medium leading-5 text-white bg-[#0f172a] cursor-pointer flex items-center gap-2 shadow-[0_0_0_0_transparent,0_0_0_0_transparent,0_1px_2px_0_rgba(0,0,0,0.05)] transition-all duration-200 border border-[#0f172a] rounded-full px-4 py-2 hover:bg-[#1e293b] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="text-sm font-medium leading-5 text-white bg-[#0f172a] dark:bg-zinc-100 dark:text-zinc-900 cursor-pointer flex items-center gap-2 shadow-[0_0_0_0_transparent,0_0_0_0_transparent,0_1px_2px_0_rgba(0,0,0,0.05)] transition-all duration-200 border border-[#0f172a] dark:border-border rounded-full px-4 py-2 hover:bg-[#1e293b] dark:hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Home className="h-4 w-4" />
               Draft a new plek
@@ -1752,14 +1752,14 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
                 )
               }}
               disabled={chatIsLoading}
-              className="text-sm font-medium leading-5 text-[#475569] bg-white cursor-pointer flex items-center gap-2 shadow-[0_0_0_0_transparent,0_0_0_0_transparent,0_1px_2px_0_rgba(0,0,0,0.05)] transition-all duration-200 border border-[#e2e8f0] rounded-full px-4 py-2 hover:bg-[#f8fafc] hover:border-[#cbd5e1] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="text-sm font-medium leading-5 text-[#475569] dark:text-foreground bg-white dark:bg-card cursor-pointer flex items-center gap-2 shadow-[0_0_0_0_transparent,0_0_0_0_transparent,0_1px_2px_0_rgba(0,0,0,0.05)] transition-all duration-200 border border-[#e2e8f0] dark:border-border rounded-full px-4 py-2 hover:bg-[#f8fafc] dark:hover:bg-muted hover:border-[#cbd5e1] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Package className="h-4 w-4" />
               Generate Packages
             </button>
             <button
               onClick={() => handleActionClick('Show my packages')}
-              className="text-sm font-medium leading-5 text-[#475569] bg-white cursor-pointer flex items-center gap-2 shadow-[0_0_0_0_transparent,0_0_0_0_transparent,0_1px_2px_0_rgba(0,0,0,0.05)] transition-all duration-200 border border-[#e2e8f0] rounded-full px-4 py-2 hover:bg-[#f8fafc] hover:border-[#cbd5e1]"
+              className="text-sm font-medium leading-5 text-[#475569] dark:text-foreground bg-white dark:bg-card cursor-pointer flex items-center gap-2 shadow-[0_0_0_0_transparent,0_0_0_0_transparent,0_1px_2px_0_rgba(0,0,0,0.05)] transition-all duration-200 border border-[#e2e8f0] dark:border-border rounded-full px-4 py-2 hover:bg-[#f8fafc] dark:hover:bg-muted hover:border-[#cbd5e1]"
             >
               <BarChart2 className="h-4 w-4" />
               Show me examples
@@ -1770,7 +1770,7 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
             {context?.data?.insights?.estimateLink && !restoredEstimate && (
               <button
                 onClick={() => handleRestoreEstimate(context.data.insights.estimateLink.estimateId)}
-                className="text-sm font-medium leading-5 text-[#0f172a] bg-[#f0fdfa] cursor-pointer flex items-center gap-2 shadow-[0_0_0_0_transparent,0_0_0_0_transparent,0_1px_2px_0_rgba(0,0,0,0.05)] transition-all duration-200 border border-[#ccfbf1] rounded-full px-4 py-2 hover:bg-[#ccfbf1] hover:border-[#99f6e4]"
+                className="text-sm font-medium leading-5 text-[#0f172a] dark:text-foreground bg-[#f0fdfa] dark:bg-teal-950/40 cursor-pointer flex items-center gap-2 shadow-[0_0_0_0_transparent,0_0_0_0_transparent,0_1px_2px_0_rgba(0,0,0,0.05)] transition-all duration-200 border border-[#ccfbf1] dark:border-teal-900/50 rounded-full px-4 py-2 hover:bg-[#ccfbf1] dark:hover:bg-teal-950/60 hover:border-[#99f6e4]"
               >
                 <Sparkles className="h-4 w-4 text-[#0d9488]" />
                 Restore Estimate
@@ -1778,21 +1778,21 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
             )}
             <button
               onClick={() => handleActionClick('Show my upcoming bookings')}
-              className="text-sm font-medium leading-5 text-[#475569] bg-white cursor-pointer flex items-center gap-2 shadow-[0_0_0_0_transparent,0_0_0_0_transparent,0_1px_2px_0_rgba(0,0,0,0.05)] transition-all duration-200 border border-[#e2e8f0] rounded-full px-4 py-2 hover:bg-[#f8fafc] hover:border-[#cbd5e1]"
+              className="text-sm font-medium leading-5 text-[#475569] dark:text-foreground bg-white dark:bg-card cursor-pointer flex items-center gap-2 shadow-[0_0_0_0_transparent,0_0_0_0_transparent,0_1px_2px_0_rgba(0,0,0,0.05)] transition-all duration-200 border border-[#e2e8f0] dark:border-border rounded-full px-4 py-2 hover:bg-[#f8fafc] dark:hover:bg-muted hover:border-[#cbd5e1]"
             >
               <Calendar className="h-4 w-4" />
               Upcoming Trips
             </button>
             <button
               onClick={() => handleActionClick('Show my past bookings')}
-              className="text-sm font-medium leading-5 text-[#475569] bg-white cursor-pointer flex items-center gap-2 shadow-[0_0_0_0_transparent,0_0_0_0_transparent,0_1px_2px_0_rgba(0,0,0,0.05)] transition-all duration-200 border border-[#e2e8f0] rounded-full px-4 py-2 hover:bg-[#f8fafc] hover:border-[#cbd5e1]"
+              className="text-sm font-medium leading-5 text-[#475569] dark:text-foreground bg-white dark:bg-card cursor-pointer flex items-center gap-2 shadow-[0_0_0_0_transparent,0_0_0_0_transparent,0_1px_2px_0_rgba(0,0,0,0.05)] transition-all duration-200 border border-[#e2e8f0] dark:border-border rounded-full px-4 py-2 hover:bg-[#f8fafc] dark:hover:bg-muted hover:border-[#cbd5e1]"
             >
               <Home className="h-4 w-4" />
               Past Bookings
             </button>
             <button
               onClick={() => handleActionClick('What are my booking insights?')}
-              className="text-sm font-medium leading-5 text-[#475569] bg-white cursor-pointer flex items-center gap-2 shadow-[0_0_0_0_transparent,0_0_0_0_transparent,0_1px_2px_0_rgba(0,0,0,0.05)] transition-all duration-200 border border-[#e2e8f0] rounded-full px-4 py-2 hover:bg-[#f8fafc] hover:border-[#cbd5e1]"
+              className="text-sm font-medium leading-5 text-[#475569] dark:text-foreground bg-white dark:bg-card cursor-pointer flex items-center gap-2 shadow-[0_0_0_0_transparent,0_0_0_0_transparent,0_1px_2px_0_rgba(0,0,0,0.05)] transition-all duration-200 border border-[#e2e8f0] dark:border-border rounded-full px-4 py-2 hover:bg-[#f8fafc] dark:hover:bg-muted hover:border-[#cbd5e1]"
             >
               <TrendingUp className="h-4 w-4" />
               View Insights

@@ -85,27 +85,31 @@ export default function MobileOnboardingClient() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white px-6">
-      <div className="w-full max-w-md space-y-6 border border-zinc-200 rounded-xl p-6">
+    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-background px-6">
+      <div className="w-full max-w-md space-y-6 border border-zinc-200 dark:border-border rounded-xl p-6 bg-white dark:bg-card">
         <div className="text-center space-y-2">
-          <h1 className="text-2xl font-semibold text-zinc-900">Verify your mobile number</h1>
-          <p className="text-sm text-zinc-500">
+          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-foreground">Verify your mobile number</h1>
+          <p className="text-sm text-zinc-500 dark:text-muted-foreground">
             To continue, we need to verify a valid mobile number for your account.
           </p>
         </div>
 
-        {error && <div className="bg-red-100 text-red-700 p-3 rounded-md text-sm">{error}</div>}
+        {error && (
+          <div className="bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-200 p-3 rounded-md text-sm">
+            {error}
+          </div>
+        )}
 
         {step === 'mobile' && (
           <form onSubmit={handleSendCode} className="grid gap-4">
             <div className="grid gap-2">
-              <label className="text-sm font-medium text-zinc-800" htmlFor="mobile-number">
+              <label className="text-sm font-medium text-zinc-800 dark:text-foreground" htmlFor="mobile-number">
                 Mobile number
               </label>
               <div className="flex gap-2">
                 <select
                   aria-label="Country code"
-                  className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm text-zinc-900"
+                  className="h-10 rounded-md border border-zinc-200 dark:border-border bg-white dark:bg-card px-3 text-sm text-zinc-900 dark:text-foreground [color-scheme:light] dark:[color-scheme:dark]"
                   value={countryCode}
                   onChange={(event) => setCountryCode(event.target.value)}
                 >
@@ -130,7 +134,7 @@ export default function MobileOnboardingClient() {
 
         {step === 'otp' && (
           <form onSubmit={handleVerifyCode} className="grid gap-4">
-            <div className="text-sm text-zinc-600 text-center">
+            <div className="text-sm text-zinc-600 dark:text-muted-foreground text-center">
               Enter the 6-digit code sent to <span className="font-medium">{normalizedMobile}</span>.
             </div>
             <div className="flex justify-center">

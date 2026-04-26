@@ -85,17 +85,17 @@ export default function ManagePageClient({ posts, latestEstimatePostId }: Manage
   }, [shouldStartOnboarding])
 
   return (
-    <div className="h-screen flex flex-col bg-[rgba(248,250,252,0.5)]">
+    <div className="h-screen flex flex-col bg-[rgba(248,250,252,0.5)] dark:bg-background">
       {/* Mobile Toggle */}
-      <div className="lg:hidden sticky top-0 z-10 bg-white border-b border-[#e2e8f0] px-4 py-3 flex items-center gap-2">
+      <div className="lg:hidden sticky top-0 z-10 bg-white dark:bg-background border-b border-[#e2e8f0] dark:border-border px-4 py-3 flex items-center gap-2">
         <SidebarMenuButton open={sidebarOpen} onOpen={() => setSidebarOpen(true)} />
-        <div className="flex-1 flex gap-2 bg-[#f1f5f9] rounded-lg p-1 min-w-0">
+        <div className="flex-1 flex gap-2 bg-[#f1f5f9] dark:bg-muted rounded-lg p-1 min-w-0">
           <button 
             onClick={() => setMobileView('dashboard')} 
             className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition-all duration-200 ${
               mobileView === 'dashboard' 
-                ? 'bg-white text-[#0f172a] shadow-sm' 
-                : 'text-[#64748b] hover:text-[#0f172a]'
+                ? 'bg-white dark:bg-card text-[#0f172a] dark:text-foreground shadow-sm' 
+                : 'text-[#64748b] dark:text-muted-foreground hover:text-[#0f172a] dark:hover:text-foreground'
             }`}
           >
             <LayoutDashboard className="h-4 w-4" />
@@ -105,8 +105,8 @@ export default function ManagePageClient({ posts, latestEstimatePostId }: Manage
             onClick={() => setMobileView('assistant')} 
             className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition-all duration-200 ${
               mobileView === 'assistant' 
-                ? 'bg-white text-[#0f172a] shadow-sm' 
-                : 'text-[#64748b] hover:text-[#0f172a]'
+                ? 'bg-white dark:bg-card text-[#0f172a] dark:text-foreground shadow-sm' 
+                : 'text-[#64748b] dark:text-muted-foreground hover:text-[#0f172a] dark:hover:text-foreground'
             }`}
           >
             <MessageSquare className="h-4 w-4" />
@@ -142,13 +142,13 @@ export default function ManagePageClient({ posts, latestEstimatePostId }: Manage
                 {activeTab === 'packages' && (
                   <>
                     {postsState.length === 0 ? (
-                      <div className="text-center py-16 bg-white rounded-xl border border-slate-200 p-8">
-                        <div className="text-gray-500 text-lg mb-4">
+                      <div className="text-center py-16 bg-white dark:bg-card rounded-xl border border-slate-200 dark:border-border p-8">
+                        <div className="text-gray-500 dark:text-muted-foreground text-lg mb-4">
                           You have no properties yet.
                         </div>
                         <Link 
                           href="/manage/properties/new" 
-                          className="inline-block bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-lg transition"
+                          className="inline-block bg-slate-900 hover:bg-slate-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 px-6 py-3 rounded-lg transition"
                         >
                           Create your first property
                         </Link>
@@ -164,8 +164,8 @@ export default function ManagePageClient({ posts, latestEstimatePostId }: Manage
                         <PackageDashboard postId={selectedPostId} startOnboarding={shouldStartOnboarding} />
                       </>
                     ) : (
-                      <div className="text-center py-16 bg-white rounded-xl border border-slate-200 p-8">
-                        <div className="text-gray-500 text-lg mb-4">
+                      <div className="text-center py-16 bg-white dark:bg-card rounded-xl border border-slate-200 dark:border-border p-8">
+                        <div className="text-gray-500 dark:text-muted-foreground text-lg mb-4">
                           Select a property from the sidebar to manage packages.
                         </div>
                       </div>
@@ -183,7 +183,7 @@ export default function ManagePageClient({ posts, latestEstimatePostId }: Manage
             </div>
 
             {/* AI Assistant Section - Docked Right */}
-            <div className={`h-full bg-white border-l border-[#e2e8f0] overflow-y-auto ${mobileView === 'assistant' ? 'block' : 'hidden lg:block'}`}>
+            <div className={`h-full bg-white dark:bg-background border-l border-[#e2e8f0] dark:border-border overflow-y-auto ${mobileView === 'assistant' ? 'block' : 'hidden lg:block'}`}>
               <div className="h-full flex flex-col">
                 <div className="flex-1 overflow-y-auto px-6 py-8">
                   <PageAIAssistant
