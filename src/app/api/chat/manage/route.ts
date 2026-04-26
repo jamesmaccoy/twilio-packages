@@ -75,6 +75,16 @@ const catalogSuggestionSchema = z.object({
     .max(4),
 })
 
+function fallbackCatalogBaseRateRands(category: string, minNights: number) {
+  const c = String(category || 'standard')
+  // Higher defaults than before; tuned for ZAR nightly pricing + obvious value ladder.
+  if (c === 'addon') return 450
+  if (c === 'hosted') return minNights <= 1 ? 650 : 850
+  if (c === 'special') return minNights <= 1 ? 550 : 750
+  // standard
+  return minNights <= 1 ? 480 : 600
+}
+
 async function runCatalogPackageSuggestions(
   payload: any,
   user: any,
@@ -100,6 +110,10 @@ async function runCatalogPackageSuggestions(
         ? (post as any).meta.description.trim()
         : ''
     const body = extractLexicalFirstParagraph((post as any)?.content)
+    const postBaseRate =
+      typeof (post as any)?.baseRate === 'number' && Number.isFinite((post as any).baseRate)
+        ? Math.max(0, Math.round((post as any).baseRate))
+        : null
 
     const knownTemplates = BASE_PACKAGE_TEMPLATES.map((t) => ({
       revenueCatId: t.revenueCatId,
@@ -122,11 +136,17 @@ Catalog:
 ${knownTemplates.map((t) => `- ${t.revenueCatId}: ${t.defaultName} [${t.category}, ${t.minNights}-${t.maxNights} nights, features: ${t.features}]`).join('\n')}
 
 Property title: "${title || 'Untitled'}"
+Property base rate (ZAR per night): "${typeof postBaseRate === 'number' ? postBaseRate : 'N/A'}"
 Property meta description: "${metaDesc || 'N/A'}"
 Property body (first paragraph): "${body || 'N/A'}"
 User hint: "${hint || 'N/A'}"
 
-Return 1–4 recommendations. suggestedName/description/features must be specific to this property, not generic.`,
+Return 1–4 recommendations. suggestedName/description/features must be specific to this property, not generic.
+
+IMPORTANT: Include a baseRate for each recommendation as a whole-number ZAR amount (e.g. 650). Use the property's base rate as a reference if provided, and adjust for tier:
+- hosted: higher than standard
+- special: mid-to-high
+- addon: one-time-ish fee (still use baseRate field)`,
     })
 
     const filtered = result.object.recommendations.filter((r) => knownIds.has(r.revenueCatId))
@@ -135,9 +155,19 @@ Return 1–4 recommendations. suggestedName/description/features must be specifi
     // "Approve all" persists the same durations as the catalog (incl. 0.5-night hourly).
     const recommendations = picked.map((r) => {
       const tpl = BASE_PACKAGE_TEMPLATES.find((t) => t.revenueCatId === r.revenueCatId)
+      const tplCategory = String(tpl?.category || 'standard')
+      const tplMin = typeof tpl?.minNights === 'number' ? tpl.minNights : 1
+      const fallbackBase = fallbackCatalogBaseRateRands(tplCategory, tplMin)
+      const baseRate =
+        typeof (r as any)?.baseRate === 'number' && Number.isFinite((r as any).baseRate)
+          ? Math.max(0, Math.round((r as any).baseRate))
+          : typeof postBaseRate === 'number' && postBaseRate > 0
+            ? Math.max(0, Math.round(postBaseRate))
+            : fallbackBase
       if (!tpl) {
         return {
           ...r,
+          baseRate,
           details: {
             minNights: 1,
             maxNights: 1,
@@ -149,6 +179,7 @@ Return 1–4 recommendations. suggestedName/description/features must be specifi
       }
       return {
         ...r,
+        baseRate,
         details: {
           minNights: tpl.minNights,
           maxNights: tpl.maxNights,

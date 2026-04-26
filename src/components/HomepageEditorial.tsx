@@ -261,6 +261,18 @@ export function HomepageEditorial({ featuredPosts = [] }: HomepageEditorialProps
 
               const href = `/posts/${slug}`
 
+              const formatZar = (rands: number) => {
+                try {
+                  return new Intl.NumberFormat('en-ZA', {
+                    style: 'currency',
+                    currency: 'ZAR',
+                    maximumFractionDigits: 0,
+                  }).format(rands)
+                } catch {
+                  return `R${Math.round(rands)}`
+                }
+              }
+
               return (
                 <LuxuryCard
                   key={slug || postId || index}
@@ -273,7 +285,11 @@ export function HomepageEditorial({ featuredPosts = [] }: HomepageEditorialProps
                   delay={index * 0.08}
                   layoutId={slug || undefined}
                   packageLabel={best ? best.name : nights > 0 ? 'Loading ideal package…' : undefined}
-                  packageMeta={best ? `${best.minNights}-${best.maxNights} nights` : undefined}
+                  packageMeta={
+                    best
+                      ? `${typeof best.baseRate === 'number' ? `${formatZar(best.baseRate)} • ` : ''}${best.minNights}-${best.maxNights} nights`
+                      : undefined
+                  }
                 />
               )
             })}
