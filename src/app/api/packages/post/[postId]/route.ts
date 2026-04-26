@@ -314,15 +314,15 @@ export async function GET(
         }
         
         // Filter packages based on customer entitlement (3-Tier System):
-        // Tier 1: Non-subscribers (none) - Only see hosted/special packages (premium experience)
+        // Tier 1: Non-subscribers (none) - Guests should still see standard packages on public pages.
         if (customerEntitlement === 'none') {
-          const shouldInclude = ['hosted', 'special'].includes(String(pkg.category || ''))
+          const shouldInclude = ['standard', 'hosted', 'special'].includes(String(pkg.category || ''))
           if (pkg.id === '68a587e7420e4517de8d2b2d') {
             console.log('🔍 Package entitlement check (none):', {
               packageId: pkg.id,
               category: pkg.category,
               shouldInclude,
-              allowedCategories: ['hosted', 'special']
+              allowedCategories: ['standard', 'hosted', 'special']
             })
           }
           return shouldInclude
