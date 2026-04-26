@@ -988,6 +988,11 @@ export async function POST(request: NextRequest) {
 - Call **suggestCatalogPackages** only if they want **different** ideas than what **createPostTool** returned.
 - Only skip createPostTool if they are clearly working with an **existing** listing already in context.
 
+📦 STARTER PACKAGE IDEAS (existing listing):
+- If the user asks to "Generate packages", "starter package ideas", or wants ideas for an **existing** property AND a postId is available in context (pageData.postId or explicitly in the message),
+  IMMEDIATELY call **suggestCatalogPackages** (NOT previewPackageTool) to return 1–4 catalog-based recommendations.
+- After suggestions are shown, the UI will offer "Approve all" to save them; do not create any packages unless the user approves.
+
 🚨 CRITICAL TOOL CALLING RULES - FOLLOW THESE EXACTLY:
 1. When a user says "CALL previewPackageTool NOW" or asks to create a package (ANY variation: "create", "make", "new package", mentions price like "R300", "package for R500", "make a package called X"), you MUST IMMEDIATELY call previewPackageTool WITHOUT any text response first — **unless** the message is primarily about creating a **new property/listing** (then follow NEW LISTING FIRST above).
 2. DO NOT ask clarifying questions - use the tool with intelligent guesses based on the user's input
