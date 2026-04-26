@@ -533,13 +533,13 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
     icon: any;
     subtext?: string;
   }) => (
-    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start justify-between">
+    <div className="bg-white dark:bg-card p-6 rounded-xl border border-slate-200 dark:border-border shadow-sm flex items-start justify-between">
       <div>
-        <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
-        <h3 className="text-2xl font-bold text-slate-900">{value}</h3>
-        {subtext && <p className="text-xs text-slate-400 mt-1">{subtext}</p>}
+        <p className="text-sm font-medium text-slate-500 dark:text-muted-foreground mb-1">{title}</p>
+        <h3 className="text-2xl font-bold text-slate-900 dark:text-foreground">{value}</h3>
+        {subtext && <p className="text-xs text-slate-400 dark:text-muted-foreground/80 mt-1">{subtext}</p>}
       </div>
-      <div className="p-2 bg-slate-50 rounded-lg text-slate-600">
+      <div className="p-2 bg-slate-50 dark:bg-muted rounded-lg text-slate-600 dark:text-muted-foreground">
         <Icon className="w-5 h-5" />
       </div>
     </div>
@@ -592,15 +592,15 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/50 text-slate-900">
+    <div className="min-h-screen bg-slate-50/50 dark:bg-background text-slate-900 dark:text-foreground">
       <div className="max-w-[1400px] mx-auto px-6 py-8">
         {/* Header Section */}
         <header className="mb-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-foreground">
               Package Dashboard
             </h1>
-            <p className="text-slate-500 mt-1">
+            <p className="text-slate-500 dark:text-muted-foreground mt-1">
               Manage your property packages and pricing tiers.
             </p>
           </div>
@@ -608,7 +608,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
             <Button
               variant="outline"
               onClick={openCreatePackageOnboarding}
-              className="border-slate-300 shadow-sm text-slate-700 bg-white hover:bg-slate-50"
+              className="border-slate-300 dark:border-border shadow-sm text-slate-700 dark:text-foreground bg-white dark:bg-card hover:bg-slate-50 dark:hover:bg-muted"
             >
               <Sparkles className="w-4 h-4 mr-2" />
               Create New Package
@@ -617,7 +617,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
               <Button
                 onClick={handleSave}
                 disabled={saving}
-                className="bg-slate-900 hover:bg-slate-800 text-white"
+                className="bg-slate-900 hover:bg-slate-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
               >
                 {saving ? (
                   <>
@@ -643,8 +643,8 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
         )}
 
         {success && (
-          <Alert className="mb-6 bg-green-50 border-green-200">
-            <AlertDescription className="text-green-800">{success}</AlertDescription>
+          <Alert className="mb-6 bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-900/50">
+            <AlertDescription className="text-green-800 dark:text-green-200">{success}</AlertDescription>
           </Alert>
         )}
 
@@ -681,29 +681,29 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
         {/* Main Content Area */}
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h2 ref={activePackagesRef} className="text-xl font-semibold text-slate-900">
+            <h2 ref={activePackagesRef} className="text-xl font-semibold text-slate-900 dark:text-foreground">
               Active Packages
             </h2>
-            <span className="text-sm text-slate-500">
+            <span className="text-sm text-slate-500 dark:text-muted-foreground">
               {packages.length} {packages.length === 1 ? 'package' : 'packages'} found
             </span>
           </div>
 
           {/* Package Grid */}
           {packages.length === 0 ? (
-            <div className="bg-slate-50/50 border-2 border-dashed border-slate-200 rounded-xl p-12 text-center">
-              <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center mx-auto mb-6">
+            <div className="bg-slate-50/50 dark:bg-muted/30 border-2 border-dashed border-slate-200 dark:border-border rounded-xl p-12 text-center">
+              <div className="w-16 h-16 bg-white dark:bg-card rounded-2xl shadow-sm border border-slate-100 dark:border-border flex items-center justify-center mx-auto mb-6">
                 <Bot className="h-8 w-8 text-teal-500" />
               </div>
-              <h3 className="text-xl font-semibold text-slate-900 mb-2">
+              <h3 className="text-xl font-semibold text-slate-900 dark:text-foreground mb-2">
                 Let AI Build Your Packages
               </h3>
-              <p className="text-slate-500 max-w-md mx-auto mb-8">
+              <p className="text-slate-500 dark:text-muted-foreground max-w-md mx-auto mb-8">
                 Instead of manually setting up packages, simply tell the AI
                 Assistant above what you need. For example: "Create a weekend
                 getaway package for couples with spa access."
               </p>
-              <div className="inline-flex items-center gap-2 text-sm font-medium text-teal-600 bg-teal-50 px-4 py-2 rounded-full border border-teal-100">
+              <div className="inline-flex items-center gap-2 text-sm font-medium text-teal-700 dark:text-teal-200 bg-teal-50 dark:bg-teal-950/30 px-4 py-2 rounded-full border border-teal-100 dark:border-teal-900/50">
                 <Sparkles className="h-4 w-4" />
                 Try asking the assistant above
               </div>
@@ -713,10 +713,10 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
               {packages.map((pkg) => (
                 <div
                   key={pkg.id}
-                  className="group bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-md transition-all duration-300 flex flex-col h-full"
+                  className="group bg-white dark:bg-card rounded-xl border border-slate-200 dark:border-border overflow-hidden hover:shadow-md transition-all duration-300 flex flex-col h-full"
                 >
                   {/* Card Header / Visual Anchor */}
-                  <div className="h-32 bg-slate-50 border-b border-slate-100 p-6 flex items-center justify-center relative">
+                  <div className="h-32 bg-slate-50 dark:bg-muted/40 border-b border-slate-100 dark:border-border p-6 flex items-center justify-center relative">
                     <div className="text-4xl filter grayscale group-hover:grayscale-0 transition-all duration-300 transform group-hover:scale-110">
                       {pkg.name.split(' ')[0] || '📦'}
                     </div>
@@ -726,7 +726,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
                           Active
                         </span>
                       ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-muted text-slate-600 dark:text-muted-foreground border border-slate-200 dark:border-border">
                           Inactive
                         </span>
                       )}
@@ -737,29 +737,29 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
                   <div className="p-5 flex-1 flex flex-col">
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex-1">
-                        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold tracking-wide uppercase text-slate-500 bg-slate-100 mb-2">
+                        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-muted-foreground bg-slate-100 dark:bg-muted mb-2">
                           {pkg.category}
                         </span>
-                        <h3 className="text-lg font-semibold text-slate-900 leading-tight group-hover:text-blue-600 transition-colors">
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-foreground leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                           {pkg.name.substring(pkg.name.indexOf(' ') + 1) || pkg.name}
                         </h3>
                       </div>
                     </div>
 
-                    <p className="text-sm text-slate-500 mb-4 line-clamp-2 flex-1">
+                    <p className="text-sm text-slate-500 dark:text-muted-foreground mb-4 line-clamp-2 flex-1">
                       {pkg.description || 'No description provided'}
                     </p>
 
                     {/* Metrics Grid */}
-                    <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-sm border-t border-slate-100 pt-4 mt-auto">
-                      <div className="flex items-center text-slate-600">
-                        <Clock className="w-4 h-4 mr-2 text-slate-400" />
+                    <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-sm border-t border-slate-100 dark:border-border pt-4 mt-auto">
+                      <div className="flex items-center text-slate-600 dark:text-muted-foreground">
+                        <Clock className="w-4 h-4 mr-2 text-slate-400 dark:text-muted-foreground/70" />
                         <span>
                           {formatDurationLabel(pkg.minNights)}–{formatDurationLabel(pkg.maxNights)}
                         </span>
                       </div>
-                      <div className="flex items-center text-slate-600">
-                        <Users className="w-4 h-4 mr-2 text-slate-400" />
+                      <div className="flex items-center text-slate-600 dark:text-muted-foreground">
+                        <Users className="w-4 h-4 mr-2 text-slate-400 dark:text-muted-foreground/70" />
                         <span className="capitalize">{pkg.entitlement || 'standard'}</span>
                       </div>
                     </div>
@@ -768,7 +768,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="w-full mt-3 text-slate-700 border-teal-200 hover:bg-teal-50"
+                      className="w-full mt-3 text-slate-700 dark:text-foreground border-teal-200 dark:border-teal-900/60 hover:bg-teal-50 dark:hover:bg-teal-950/30"
                       onClick={() => openRefinePackageOnboarding(pkg.id)}
                     >
                       <Sparkles className="w-4 h-4 mr-2 text-teal-600" />
@@ -776,27 +776,30 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
                     </Button>
 
                     {/* Footer Price */}
-                    <div className="mt-4 pt-4 border-t border-slate-100">
+                    <div className="mt-4 pt-4 border-t border-slate-100 dark:border-border">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex flex-col">
-                          <span className="text-xs text-slate-400 font-medium">Base Rate</span>
-                          <span className="text-lg font-bold text-slate-900">
+                          <span className="text-xs text-slate-400 dark:text-muted-foreground font-medium">Base Rate</span>
+                          <span className="text-lg font-bold text-slate-900 dark:text-foreground">
                             {formatCurrency(pkg.baseRate)}
                           </span>
                         </div>
                         {pkg.multiplier !== 1 && (
-                          <div className="text-xs text-slate-500">
+                          <div className="text-xs text-slate-500 dark:text-muted-foreground">
                             {pkg.multiplier > 1 ? '+' : ''}{((pkg.multiplier - 1) * 100).toFixed(0)}% multiplier
                           </div>
                         )}
                       </div>
                       {/* Token Value Display */}
                       {pkg.baseRate && pkg.baseRate > 0 && (
-                        <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
-                          <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                        <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-border">
+                          <Badge
+                            variant="outline"
+                            className="text-xs bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-200 dark:border-purple-900/50"
+                          >
                             🪙 {calculateTokenValue(pkg.baseRate, pkg.multiplier)} tokens
                           </Badge>
-                          <span className="text-xs text-slate-400">
+                          <span className="text-xs text-slate-400 dark:text-muted-foreground">
                             (R10 = 1 token)
                           </span>
                         </div>
@@ -807,7 +810,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
                       }}>
                         <DialogTrigger asChild>
                           <button
-                            className="text-slate-400 hover:text-slate-600 hover:bg-slate-50 p-2 rounded-full transition-colors"
+                            className="text-slate-400 dark:text-muted-foreground hover:text-slate-600 dark:hover:text-foreground hover:bg-slate-50 dark:hover:bg-muted p-2 rounded-full transition-colors"
                           >
                             <MoreHorizontal className="w-5 h-5" />
                           </button>
@@ -822,7 +825,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
                           {editingPackage && editingPackage.id === pkg.id && (
                             <div className="space-y-4">
                               <div>
-                                <label className="text-sm font-medium text-gray-600">Name</label>
+                                <label className="text-sm font-medium text-slate-600 dark:text-muted-foreground">Name</label>
                                 <Input
                                   value={editingPackage.name || ''}
                                   onChange={e => setEditingPackage({ ...editingPackage, name: e.target.value })}
@@ -830,7 +833,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
                                 />
                               </div>
                               <div>
-                                <label className="text-sm font-medium text-gray-600">Description</label>
+                                <label className="text-sm font-medium text-slate-600 dark:text-muted-foreground">Description</label>
                                 <Textarea
                                   value={editingPackage.description || ''}
                                   onChange={e => setEditingPackage({ ...editingPackage, description: e.target.value })}
@@ -840,7 +843,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
                               </div>
                               <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                  <label className="text-sm font-medium text-gray-600">Category</label>
+                                  <label className="text-sm font-medium text-slate-600 dark:text-muted-foreground">Category</label>
                                   <Select
                                     value={editingPackage.category || 'standard'}
                                     onValueChange={value => setEditingPackage({ ...editingPackage, category: value as any })}
@@ -857,7 +860,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
                                   </Select>
                                 </div>
                                 <div>
-                                  <label className="text-sm font-medium text-gray-600">Entitlement</label>
+                                  <label className="text-sm font-medium text-slate-600 dark:text-muted-foreground">Entitlement</label>
                                   <Select
                                     value={editingPackage.entitlement || 'standard'}
                                     onValueChange={value => setEditingPackage({ ...editingPackage, entitlement: value as any })}
@@ -873,14 +876,14 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
                                 </div>
                               </div>
                               <div>
-                                <label className="text-sm font-medium text-gray-600">Duration Range</label>
+                                <label className="text-sm font-medium text-slate-600 dark:text-muted-foreground">Duration Range</label>
                                 <div className="mt-2 space-y-2">
                                   <div className="flex items-center justify-between">
-                                    <span className="text-xs text-slate-500">Hourly (4h)</span>
-                                    <span className="text-xs font-medium text-slate-700">
+                                    <span className="text-xs text-slate-500 dark:text-muted-foreground">Hourly (4h)</span>
+                                    <span className="text-xs font-medium text-slate-700 dark:text-foreground">
                                       {formatDurationLabel(editingPackage.minNights ?? 1)}–{formatDurationLabel(editingPackage.maxNights ?? 7)}
                                     </span>
-                                    <span className="text-xs text-slate-500">Monthly (30d)</span>
+                                    <span className="text-xs text-slate-500 dark:text-muted-foreground">Monthly (30d)</span>
                                   </div>
                                   <Slider
                                     min={0}
@@ -904,7 +907,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
                               </div>
                               <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                  <label className="text-sm font-medium text-gray-600">Multiplier</label>
+                                  <label className="text-sm font-medium text-slate-600 dark:text-muted-foreground">Multiplier</label>
                                   <Input
                                     type="number"
                                     step="0.01"
@@ -916,7 +919,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
                                   />
                                 </div>
                                 <div>
-                                  <label className="text-sm font-medium text-gray-600">Base Rate (R)</label>
+                                  <label className="text-sm font-medium text-slate-600 dark:text-muted-foreground">Base Rate (R)</label>
                                   <Input
                                     type="number"
                                     min="0"
@@ -942,7 +945,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
                                 </div>
                               </div>
                               <div>
-                                <label className="text-sm font-medium text-gray-600">Custom Display Name</label>
+                                <label className="text-sm font-medium text-slate-600 dark:text-muted-foreground">Custom Display Name</label>
                                 <Input
                                   value={editingPackage.customName || ''}
                                   onChange={e => setEditingPackage({ ...editingPackage, customName: e.target.value })}
@@ -958,7 +961,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
                                 <label className="text-sm font-medium">Enabled</label>
                               </div>
                               {editingPackage.revenueCatId && (
-                                <div className="text-xs text-gray-400">
+                                <div className="text-xs text-slate-400 dark:text-muted-foreground">
                                   RevenueCat ID: {editingPackage.revenueCatId}
                                 </div>
                               )}
@@ -1019,15 +1022,15 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
               {/* Add New Card Placeholder */}
               <button
                 onClick={openCreatePackageOnboarding}
-                className="group border-2 border-dashed border-slate-200 rounded-xl p-6 flex flex-col items-center justify-center text-center hover:border-slate-400 hover:bg-slate-50 transition-all duration-300 min-h-[300px]"
+                className="group border-2 border-dashed border-slate-200 dark:border-border rounded-xl p-6 flex flex-col items-center justify-center text-center hover:border-slate-400 dark:hover:border-zinc-600 hover:bg-slate-50 dark:hover:bg-muted transition-all duration-300 min-h-[300px]"
               >
-                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-4 group-hover:bg-white group-hover:shadow-sm transition-all">
-                  <Package className="w-6 h-6 text-slate-400 group-hover:text-slate-600" />
+                <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-muted flex items-center justify-center mb-4 group-hover:bg-white dark:group-hover:bg-card group-hover:shadow-sm transition-all">
+                  <Package className="w-6 h-6 text-slate-400 dark:text-muted-foreground group-hover:text-slate-600 dark:group-hover:text-foreground" />
                 </div>
-                <h3 className="text-lg font-medium text-slate-900 mb-1">
+                <h3 className="text-lg font-medium text-slate-900 dark:text-foreground mb-1">
                   Create New Packagess
                 </h3>
-                <p className="text-sm text-slate-500 max-w-[200px]">
+                <p className="text-sm text-slate-500 dark:text-muted-foreground max-w-[200px]">
                   Describe your package and let AI generate the details.
                 </p>
               </button>
