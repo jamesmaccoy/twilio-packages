@@ -1043,7 +1043,22 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
                                 <ul className="space-y-3">
                                   {recs.map((r: any, i: number) => (
                                     <li key={i} className="rounded-md border bg-white p-3 shadow-sm">
-                                      <div className="font-semibold text-slate-900">{r.suggestedName}</div>
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div className="font-semibold text-slate-900">{r.suggestedName}</div>
+                                        {postIdForSuggestions ? (
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={chatIsLoading || isApprovingSuggestions}
+                                            onClick={() => void handleApproveCatalogSuggestions(postIdForSuggestions, [r])}
+                                            className="bg-white border-teal-200 text-[10px] h-7 px-2"
+                                            title="Create this package only"
+                                          >
+                                            Approve
+                                          </Button>
+                                        ) : null}
+                                      </div>
                                       <div className="text-xs text-slate-500 font-mono mt-0.5">
                                         {r.revenueCatId}
                                       </div>
@@ -1733,7 +1748,7 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
                   return
                 }
                 handleActionClick(
-                  `Suggest 1–4 starter package ideas for my existing property (postId "${pid}"). Include sub-day options where relevant (e.g. 4 hours -> 0.5 nights). Then let me approve them.`,
+                  `CALL suggestCatalogPackages NOW for postId "${pid}". Return 1–4 starter package ideas from the fixed catalog (revenueCatId must match). Include sub-day options where relevant (e.g. 4 hours -> 0.5 nights). Then let me approve them.`,
                 )
               }}
               disabled={chatIsLoading}

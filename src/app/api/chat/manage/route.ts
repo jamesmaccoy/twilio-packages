@@ -995,6 +995,7 @@ export async function POST(request: NextRequest) {
 
 🚨 CRITICAL TOOL CALLING RULES - FOLLOW THESE EXACTLY:
 1. When a user says "CALL previewPackageTool NOW" or asks to create a package (ANY variation: "create", "make", "new package", mentions price like "R300", "package for R500", "make a package called X"), you MUST IMMEDIATELY call previewPackageTool WITHOUT any text response first — **unless** the message is primarily about creating a **new property/listing** (then follow NEW LISTING FIRST above).
+1b. When a user says "CALL suggestCatalogPackages NOW" (or "Generate packages") for an existing listing and provides a postId, you MUST IMMEDIATELY call suggestCatalogPackages with that postId — NO TEXT FIRST.
 2. DO NOT ask clarifying questions - use the tool with intelligent guesses based on the user's input
 3. DO NOT respond with text explaining what you'll do - just call the tool IMMEDIATELY
 4. DO NOT say "I'll create..." or "Let me..." - just call previewPackageTool right away
