@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import configPromise from '@/payload.config'
+import { BASE_PACKAGE_TEMPLATES } from '@/lib/package-types'
 
 type Suggestion = {
   revenueCatId?: string
@@ -8,6 +9,9 @@ type Suggestion = {
   description?: string
   features?: string[]
   baseRate?: number
+  /** Top-level nights (optional; merged from catalog templates when missing) */
+  minNights?: number
+  maxNights?: number
   details?: {
     minNights?: number
     maxNights?: number
@@ -16,6 +20,37 @@ type Suggestion = {
     customerTierRequired?: 'standard' | 'pro' | string
     features?: string
   }
+}
+
+function parseFiniteNumber(v: unknown, fallback: number): number {
+  if (typeof v === 'number' && Number.isFinite(v)) return v
+  if (typeof v === 'string' && v.trim()) {
+    const n = Number(v.trim())
+    if (Number.isFinite(n)) return n
+  }
+  return fallback
+}
+
+function resolveSuggestionFields(s: Suggestion) {
+  const tpl = BASE_PACKAGE_TEMPLATES.find((t) => t.revenueCatId === s.revenueCatId)
+  const d = (s.details || {}) as Record<string, unknown>
+  const tplMin = tpl?.minNights ?? 1
+  const tplMax = tpl?.maxNights ?? tplMin
+
+  let minNights = parseFiniteNumber(d.minNights ?? s.minNights, tplMin)
+  let maxNights = parseFiniteNumber(d.maxNights ?? s.maxNights, tplMax)
+  minNights = Math.max(0.5, minNights)
+  maxNights = Math.max(0.5, maxNights)
+  if (maxNights < minNights) maxNights = minNights
+
+  const category = (String(d.category || tpl?.category || 'standard') || 'standard') as any
+  const multiplierRaw = parseFiniteNumber(d.multiplier ?? tpl?.baseMultiplier, 1)
+  const multiplier = Number.isFinite(multiplierRaw) ? Math.min(3, Math.max(0.1, multiplierRaw)) : 1
+
+  const tierRaw = String(d.customerTierRequired || tpl?.customerTierRequired || 'standard').toLowerCase()
+  const entitlement = tierRaw.includes('pro') ? 'pro' : 'standard'
+
+  return { minNights, maxNights, category, multiplier, entitlement }
 }
 
 export async function POST(req: NextRequest) {
@@ -48,17 +83,7 @@ export async function POST(req: NextRequest) {
       const description = String(s?.description || '').trim() || undefined
       const details = (s?.details || {}) as any
 
-      const category = (String(details?.category || 'standard') || 'standard') as any
-      const minNightsRaw = Number(details?.minNights ?? 1)
-      const maxNightsRaw = Number(details?.maxNights ?? minNightsRaw ?? 1)
-      const minNights = Number.isFinite(minNightsRaw) ? Math.max(0.5, minNightsRaw) : 1
-      const maxNights = Number.isFinite(maxNightsRaw) ? Math.max(0.5, maxNightsRaw) : minNights
-
-      const multiplierRaw = Number(details?.multiplier ?? 1)
-      const multiplier = Number.isFinite(multiplierRaw) ? multiplierRaw : 1
-
-      const customerTierRequired = String(details?.customerTierRequired || 'standard').toLowerCase()
-      const entitlement = customerTierRequired.includes('pro') ? 'pro' : 'standard'
+      const { minNights, maxNights, category, multiplier, entitlement } = resolveSuggestionFields(s)
 
       const features =
         Array.isArray(s?.features) && s.features.length > 0

@@ -187,6 +187,7 @@ export function PageAIAssistant({ context, placeholder, className, showActions =
   const {
     messages = [],
     sendMessage,
+    setMessages,
     stop: chatStop,
     status,
     error: chatError
@@ -499,18 +500,66 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
 
         const data = await res.json()
         const created = Array.isArray(data?.created) ? data.created : []
+        if (created.length === 0) {
+          throw new Error('No packages were returned from the server')
+        }
         window.dispatchEvent(
           new CustomEvent('packagesApproved', {
             detail: { postId, created },
           }),
         )
-      } catch (e) {
+
+        const summaryLines = created
+          .map((p: any) => {
+            const label = String(p?.name || 'Package').trim()
+            const min = p?.minNights
+            const max = p?.maxNights
+            const dur =
+              typeof min === 'number' && typeof max === 'number'
+                ? `${min}–${max} nights`
+                : 'duration pending sync'
+            return `• ${label} (${dur})`
+          })
+          .join('\n')
+
+        if (typeof setMessages === 'function') {
+          setMessages((prev: any[]) => [
+            ...prev,
+            {
+              id: `local-approve-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+              role: 'assistant',
+              parts: [
+                {
+                  type: 'text',
+                  text: `Packages saved successfully (${created.length}). They should appear under Active Packages on the dashboard.\n\n${summaryLines}`,
+                },
+              ],
+            },
+          ])
+        }
+      } catch (e: any) {
         console.error('Failed approving catalog suggestions:', e)
+        const msg = typeof e?.message === 'string' ? e.message : 'Unknown error'
+        if (typeof setMessages === 'function') {
+          setMessages((prev: any[]) => [
+            ...prev,
+            {
+              id: `local-approve-err-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+              role: 'assistant',
+              parts: [
+                {
+                  type: 'text',
+                  text: `Packages were not saved: ${msg}`,
+                },
+              ],
+            },
+          ])
+        }
       } finally {
         setIsApprovingSuggestions(false)
       }
     },
-    [isApprovingSuggestions, isManageContext],
+    [isApprovingSuggestions, isManageContext, setMessages],
   )
 
   const handleCancelPackage = () => {
@@ -998,6 +1047,13 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
                                       <div className="text-xs text-slate-500 font-mono mt-0.5">
                                         {r.revenueCatId}
                                       </div>
+                                      {r.details &&
+                                      (typeof r.details.minNights === 'number' ||
+                                        typeof r.details.maxNights === 'number') ? (
+                                        <p className="text-xs text-slate-500 mt-1">
+                                          Duration: {r.details.minNights}–{r.details.maxNights} nights
+                                        </p>
+                                      ) : null}
                                       <p className="text-xs text-slate-600 mt-2">{r.description}</p>
                                     </li>
                                   ))}
@@ -1084,6 +1140,13 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
                                       <div className="text-xs text-slate-500 font-mono mt-0.5">
                                         {r.revenueCatId}
                                       </div>
+                                      {r.details &&
+                                      (typeof r.details.minNights === 'number' ||
+                                        typeof r.details.maxNights === 'number') ? (
+                                        <p className="text-xs text-slate-500 mt-1">
+                                          Duration: {r.details.minNights}–{r.details.maxNights} nights
+                                        </p>
+                                      ) : null}
                                       <p className="text-xs text-slate-600 mt-2">{r.description}</p>
                                     </li>
                                   ))}

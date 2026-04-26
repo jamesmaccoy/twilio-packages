@@ -85,7 +85,7 @@ const Packages: CollectionConfig = {
       type: 'number', 
       required: false, // Changed to false to prevent forced defaults
       defaultValue: 7, 
-      min: 1 
+      min: 0.5 
     },
     {
       name: 'maxConcurrentBookings',

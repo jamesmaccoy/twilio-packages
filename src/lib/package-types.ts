@@ -567,8 +567,8 @@ export const BASE_PACKAGE_TEMPLATES: BasePackageConfig[] = [
     id: 'per_hour_standard',
     category: 'standard',
     durationTier: 'single',
-    minNights: 1,
-    maxNights: 1,
+    minNights: 0.5,
+    maxNights: 0.5,
     baseMultiplier: 0.1,
     features: [
       {
@@ -599,8 +599,8 @@ export const BASE_PACKAGE_TEMPLATES: BasePackageConfig[] = [
     id: 'per_hour_luxury',
     category: 'hosted',
     durationTier: 'single',
-    minNights: 1,
-    maxNights: 1,
+    minNights: 0.5,
+    maxNights: 0.5,
     baseMultiplier: 0.15,
     features: [
       {

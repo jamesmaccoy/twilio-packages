@@ -130,7 +130,34 @@ Return 1–4 recommendations. suggestedName/description/features must be specifi
     })
 
     const filtered = result.object.recommendations.filter((r) => knownIds.has(r.revenueCatId))
-    const recommendations = filtered.length ? filtered : result.object.recommendations
+    const picked = filtered.length ? filtered : result.object.recommendations
+    // Catalog rows do not include min/max in the LLM schema — attach template nights so
+    // "Approve all" persists the same durations as the catalog (incl. 0.5-night hourly).
+    const recommendations = picked.map((r) => {
+      const tpl = BASE_PACKAGE_TEMPLATES.find((t) => t.revenueCatId === r.revenueCatId)
+      if (!tpl) {
+        return {
+          ...r,
+          details: {
+            minNights: 1,
+            maxNights: 1,
+            category: 'standard' as const,
+            customerTierRequired: 'standard' as const,
+            multiplier: 1,
+          },
+        }
+      }
+      return {
+        ...r,
+        details: {
+          minNights: tpl.minNights,
+          maxNights: tpl.maxNights,
+          category: tpl.category,
+          customerTierRequired: tpl.customerTierRequired,
+          multiplier: tpl.baseMultiplier,
+        },
+      }
+    })
     return {
       success: true,
       postId: pid,
