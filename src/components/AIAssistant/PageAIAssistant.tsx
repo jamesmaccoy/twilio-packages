@@ -1020,7 +1020,7 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
                                     size="sm"
                                     disabled={chatIsLoading || isApprovingSuggestions}
                                     onClick={() => void handleApproveCatalogSuggestions(postIdForSuggestions, recs)}
-                                    className="bg-white border-teal-200 text-xs"
+                                    className="bg-white border-teal-200 text-slate-900 hover:bg-teal-50/60 hover:text-teal-950 text-xs dark:bg-zinc-900 dark:border-teal-900/60 dark:text-zinc-100 dark:hover:bg-teal-950/30 dark:hover:text-zinc-50"
                                     title="Create all suggested packages for this listing"
                                   >
                                     {isApprovingSuggestions ? (
@@ -1052,7 +1052,7 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
                                             size="sm"
                                             disabled={chatIsLoading || isApprovingSuggestions}
                                             onClick={() => void handleApproveCatalogSuggestions(postIdForSuggestions, [r])}
-                                            className="bg-white border-teal-200 text-[10px] h-7 px-2"
+                                            className="bg-white border-teal-200 text-slate-900 hover:bg-teal-50/60 hover:text-teal-950 text-[10px] h-7 px-2 dark:bg-zinc-900 dark:border-teal-900/60 dark:text-zinc-100 dark:hover:bg-teal-950/30 dark:hover:text-zinc-50"
                                             title="Create this package only"
                                           >
                                             Approve
@@ -1482,11 +1482,11 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
                 type="button"
                 variant="default"
                 size="sm"
-                className="rounded-full bg-[#0f172a] hover:bg-[#1e293b]"
+                className="rounded-full bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
                 onClick={() => applyManageQuickPrompt(MANAGE_NEW_LISTING_PROMPT)}
               >
                 <Home className="h-3.5 w-3.5 mr-1.5" />
-                New plek
+               Draft new plek
               </Button>
             </div>
           )}

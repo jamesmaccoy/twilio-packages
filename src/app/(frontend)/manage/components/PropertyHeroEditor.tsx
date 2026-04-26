@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { ImagePlus, Loader2, X } from "lucide-react"
+import { ImagePlus, Loader2, MoreHorizontal, X } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -236,7 +236,7 @@ export function PropertyHeroEditor({ postId, onListingDeleted }: PropertyHeroEdi
 
   return (
     <section className="sticky top-0 z-20 -mx-6 px-6 py-3 mb-6 border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 shadow-sm">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+      <div className="flex flex-row items-center gap-3 sm:gap-4">
         <div className="relative h-14 w-24 sm:h-16 sm:w-28 flex-shrink-0 rounded-md overflow-hidden border border-slate-200 bg-slate-100">
           {loading ? (
             <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-xs">
@@ -264,9 +264,17 @@ export function PropertyHeroEditor({ postId, onListingDeleted }: PropertyHeroEdi
           {error ? <p className="text-xs text-red-600 mt-2">{error}</p> : null}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
-          <Button type="button" variant="outline" size="sm" onClick={() => setEditOpen(true)} disabled={loading}>
-            Edit / Delete
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => setEditOpen(true)}
+            disabled={loading}
+            aria-label="Edit or delete listing"
+            title="Edit / Delete"
+          >
+            <MoreHorizontal className="h-4 w-4" />
           </Button>
         </div>
       </div>
