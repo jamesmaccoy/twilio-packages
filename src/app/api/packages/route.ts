@@ -151,11 +151,28 @@ export async function DELETE(request: NextRequest) {
     }
     
     const { searchParams } = new URL(request.url)
-    const ids = searchParams.getAll('where[id][in][]')
-    
+
+    // Parse package IDs from query parameters (Payload admin bulk delete shapes the URL)
+    // where[and][0][id][in][0], where[and][0][id][in][1], … or where[id][in][0] / where[id][in][]
+    const packageIds: string[] = []
+    searchParams.forEach((value, key) => {
+      if (key.match(/where\[and\]\[\d+\]\[id\]\[in\]\[\d+\]/)) {
+        packageIds.push(value)
+      } else if (key.match(/where\[id\]\[in\]\[\d+\]/)) {
+        packageIds.push(value)
+      } else if (key === 'where[id][in][]') {
+        packageIds.push(value)
+      }
+    })
+    const arrayIds = searchParams.getAll('where[id][in][]')
+    if (arrayIds.length > 0) {
+      packageIds.push(...arrayIds)
+    }
+    const ids = [...new Set(packageIds)]
+
     console.log('DELETE request for packages:', { ids, user: user?.id ? '[REDACTED]' : 'admin' })
-    
-    if (!ids || ids.length === 0) {
+
+    if (ids.length === 0) {
       return NextResponse.json(
         { error: 'No package IDs provided' },
         { status: 400 }
