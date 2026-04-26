@@ -48,10 +48,10 @@ export default function LoginPage() {
       </div>
 
       {/* Right Side - Form */}
-      <div className="relative flex flex-col items-center justify-center p-8 bg-white">
+      <div className="relative flex flex-col items-center justify-center p-8 bg-white dark:bg-background">
         {/* Mobile Logo (visible only on small screens) */}
-        <div className="lg:hidden absolute top-8 left-8 flex items-center gap-2 font-medium">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 text-white">
+        <div className="lg:hidden absolute top-8 left-8 flex items-center gap-2 font-medium text-zinc-900 dark:text-zinc-100">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900">
             <Command className="h-4 w-4" />
           </div>
           SimplePlek
@@ -60,10 +60,10 @@ export default function LoginPage() {
         <div className="w-full max-w-[450px] space-y-8">
           {/* Header */}
           <div className="mb-8 text-center">
-            <h1 className="text-3xl font-bold tracking-tight text-zinc-900 mb-2">
+            <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 mb-2">
               Sign in or create your account
             </h1>
-            <p className="text-zinc-500 text-base">
+            <p className="text-zinc-500 dark:text-zinc-400 text-base">
               Use your email, mobile, password, or Google in one flow
             </p>
           </div>
@@ -72,21 +72,21 @@ export default function LoginPage() {
 
           {/* Footer */}
           <div className="mt-6 space-y-3">
-            <p className="text-center text-sm text-zinc-500">
+            <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
               New here? Continue with email, mobile, or Google and we&apos;ll create your account if needed.
             </p>
-            <p className="text-center text-xs text-zinc-400">
+            <p className="text-center text-xs text-zinc-400 dark:text-zinc-500">
               By continuing, you agree to our{' '}
               <Link
                 href="/terms-of-service"
-                className="hover:text-zinc-600 underline underline-offset-2"
+                className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 underline underline-offset-2"
               >
                 Terms of Service
               </Link>
               {' '}and{' '}
               <Link
                 href="/privacy-policy"
-                className="hover:text-zinc-600 underline underline-offset-2"
+                className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 underline underline-offset-2"
               >
                 Privacy Policy
               </Link>

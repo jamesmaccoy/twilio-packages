@@ -61,7 +61,7 @@ export function LuxuryCard({
     >
       <Link href={href} className="group block w-full cursor-pointer">
         <motion.div 
-          className="relative overflow-hidden aspect-[3/4] mb-6 bg-[#f0f0f0]"
+          className="relative overflow-hidden aspect-[3/4] mb-6 bg-[#f0f0f0] dark:bg-zinc-800"
           layoutId={layoutId ? `post-image-${layoutId}` : undefined}
         >
           <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors duration-500 z-10" />
@@ -73,7 +73,7 @@ export function LuxuryCard({
               layoutId={layoutId ? `post-image-content-${layoutId}` : undefined}
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-gray-400">
+            <div className="w-full h-full flex items-center justify-center text-gray-400 dark:text-zinc-500">
               No image
             </div>
           )}
@@ -96,28 +96,28 @@ export function LuxuryCard({
 
             {packageLabel && (
               <div className="flex flex-wrap items-center gap-2 mb-3">
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs border border-[#e5e5e5] bg-white text-[#0a0a0a]">
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs border border-[#e5e5e5] bg-white text-[#0a0a0a] dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100">
                   {packageLabel}
                 </span>
                 {packageMeta && (
-                  <span className="text-xs text-[#999]">{packageMeta}</span>
+                  <span className="text-xs text-[#999] dark:text-zinc-400">{packageMeta}</span>
                 )}
               </div>
             )}
 
-            <h3 className="font-serif-display text-3xl text-[#0a0a0a] leading-tight group-hover:text-secondary transition-colors duration-300">
+            <h3 className="font-serif-display text-3xl text-[#0a0a0a] dark:text-zinc-100 leading-tight group-hover:text-secondary transition-colors duration-300">
               {title}
             </h3>
           </div>
 
           {tags && (
-            <p className="text-xs text-gray-500 uppercase tracking-wider border-t border-gray-200 pt-3 mt-3">
+            <p className="text-xs text-gray-500 dark:text-zinc-400 uppercase tracking-wider border-t border-gray-200 dark:border-zinc-700 pt-3 mt-3">
               {tags}
             </p>
           )}
 
           {description && (
-            <p className="font-serif-text text-lg text-gray-600 leading-relaxed line-clamp-2">
+            <p className="font-serif-text text-lg text-gray-600 dark:text-zinc-400 leading-relaxed line-clamp-2">
               {description}
             </p>
           )}

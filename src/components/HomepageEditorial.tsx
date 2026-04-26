@@ -136,9 +136,9 @@ export function HomepageEditorial({ featuredPosts = [] }: HomepageEditorialProps
   }, [filteredPosts])
 
   return (
-    <main className="bg-[#ffffff] min-h-screen w-full overflow-x-hidden">
+    <main className="bg-white dark:bg-background min-h-screen w-full overflow-x-hidden text-foreground">
       {/* Intro Text Section */}
-      <section className="py-24 px-6 md:px-12 text-center bg-[#faf9f7]">
+      <section className="py-24 px-6 md:px-12 text-center bg-[#faf9f7] dark:bg-zinc-950">
         <motion.div
           initial={{
             opacity: 0,
@@ -156,7 +156,7 @@ export function HomepageEditorial({ featuredPosts = [] }: HomepageEditorialProps
           }}
           className="max-w-4xl mx-auto"
         >
-          <h2 className="font-serif-display text-4xl md:text-6xl text-[#0a0a0a] leading-tight mb-8">
+          <h2 className="font-serif-display text-4xl md:text-6xl text-[#0a0a0a] dark:text-zinc-100 leading-tight mb-8">
             Curated sanctuaries for the{' '}
             <span className="italic font-serif-text text-secondary">
               modern traveler
@@ -167,12 +167,12 @@ export function HomepageEditorial({ featuredPosts = [] }: HomepageEditorialProps
       </section>
 
       {/* Property Explorer (Airbnb-style) */}
-      <section className="px-6 md:px-12 pb-24 bg-[#faf9f7]">
+      <section className="px-6 md:px-12 pb-24 bg-[#faf9f7] dark:bg-zinc-950">
         <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-10 border-b border-[#e5e5e5] pb-6">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-10 border-b border-[#e5e5e5] dark:border-zinc-800 pb-6">
             <div>
-              <h3 className="font-serif-display text-3xl text-[#0a0a0a]">Find your Plek</h3>
-              <p className="text-[#666] mt-2">Pick a region, choose your dates, and we’ll surface the ideal package.</p>
+              <h3 className="font-serif-display text-3xl text-[#0a0a0a] dark:text-zinc-100">Find your Plek</h3>
+              <p className="text-[#666] dark:text-zinc-400 mt-2">Pick a region, choose your dates, and we’ll surface the ideal package.</p>
             </div>
             <LuxuryButton href="/posts/page/1" variant="text" className="self-start md:self-auto">
               View All
@@ -187,8 +187,8 @@ export function HomepageEditorial({ featuredPosts = [] }: HomepageEditorialProps
                 onClick={() => setActiveCategoryId('all')}
                 className={`px-4 py-2 rounded-full text-sm border transition-colors ${
                   activeCategoryId === 'all'
-                    ? 'bg-[#0a0a0a] text-white border-[#0a0a0a]'
-                    : 'bg-white text-[#0a0a0a] border-[#e5e5e5] hover:border-[#0a0a0a]'
+                    ? 'bg-[#0a0a0a] text-white border-[#0a0a0a] dark:bg-zinc-100 dark:text-zinc-900 dark:border-zinc-100'
+                    : 'bg-white text-[#0a0a0a] border-[#e5e5e5] hover:border-[#0a0a0a] dark:bg-zinc-900 dark:text-zinc-100 dark:border-zinc-700 dark:hover:border-zinc-400'
                 }`}
               >
                 All
@@ -200,8 +200,8 @@ export function HomepageEditorial({ featuredPosts = [] }: HomepageEditorialProps
                   onClick={() => setActiveCategoryId(c.id)}
                   className={`px-4 py-2 rounded-full text-sm border transition-colors ${
                     activeCategoryId === c.id
-                      ? 'bg-[#0a0a0a] text-white border-[#0a0a0a]'
-                      : 'bg-white text-[#0a0a0a] border-[#e5e5e5] hover:border-[#0a0a0a]'
+                      ? 'bg-[#0a0a0a] text-white border-[#0a0a0a] dark:bg-zinc-100 dark:text-zinc-900 dark:border-zinc-100'
+                      : 'bg-white text-[#0a0a0a] border-[#e5e5e5] hover:border-[#0a0a0a] dark:bg-zinc-900 dark:text-zinc-100 dark:border-zinc-700 dark:hover:border-zinc-400'
                   }`}
                 >
                   {c.title}
@@ -210,30 +210,30 @@ export function HomepageEditorial({ featuredPosts = [] }: HomepageEditorialProps
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="bg-white border border-[#e5e5e5] rounded-lg p-4">
-                <label className="block text-xs uppercase tracking-wider text-[#666] mb-2">Check in</label>
+              <div className="bg-white dark:bg-zinc-900 border border-[#e5e5e5] dark:border-zinc-700 rounded-lg p-4 [color-scheme:light] dark:[color-scheme:dark]">
+                <label className="block text-xs uppercase tracking-wider text-[#666] dark:text-zinc-400 mb-2">Check in</label>
                 <input
                   type="date"
                   value={fromDate}
                   onChange={(e) => setFromDate(e.target.value)}
-                  className="w-full text-[#0a0a0a] bg-transparent outline-none"
+                  className="w-full text-[#0a0a0a] dark:text-zinc-100 bg-transparent outline-none"
                 />
               </div>
-              <div className="bg-white border border-[#e5e5e5] rounded-lg p-4">
-                <label className="block text-xs uppercase tracking-wider text-[#666] mb-2">Check out</label>
+              <div className="bg-white dark:bg-zinc-900 border border-[#e5e5e5] dark:border-zinc-700 rounded-lg p-4 [color-scheme:light] dark:[color-scheme:dark]">
+                <label className="block text-xs uppercase tracking-wider text-[#666] dark:text-zinc-400 mb-2">Check out</label>
                 <input
                   type="date"
                   value={toDate}
                   onChange={(e) => setToDate(e.target.value)}
-                  className="w-full text-[#0a0a0a] bg-transparent outline-none"
+                  className="w-full text-[#0a0a0a] dark:text-zinc-100 bg-transparent outline-none"
                 />
               </div>
-              <div className="bg-white border border-[#e5e5e5] rounded-lg p-4 flex items-center justify-between">
+              <div className="bg-white dark:bg-zinc-900 border border-[#e5e5e5] dark:border-zinc-700 rounded-lg p-4 flex items-center justify-between">
                 <div>
-                  <p className="text-xs uppercase tracking-wider text-[#666]">Stay length</p>
-                  <p className="text-lg text-[#0a0a0a] font-medium">{nights > 0 ? `${nights} night${nights === 1 ? '' : 's'}` : '—'}</p>
+                  <p className="text-xs uppercase tracking-wider text-[#666] dark:text-zinc-400">Stay length</p>
+                  <p className="text-lg text-[#0a0a0a] dark:text-zinc-100 font-medium">{nights > 0 ? `${nights} night${nights === 1 ? '' : 's'}` : '—'}</p>
                 </div>
-                <p className="text-xs text-[#999]">Drives ideal package</p>
+                <p className="text-xs text-[#999] dark:text-zinc-500">Drives ideal package</p>
               </div>
             </div>
           </div>

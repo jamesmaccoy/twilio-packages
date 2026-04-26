@@ -26,10 +26,10 @@ export function LuxuryButton({
     primary:
       'bg-secondary text-secondary-foreground hover:bg-secondary/90 shadow-sm hover:shadow-md',
     secondary:
-      'bg-white text-[#0a0a0a] border border-[#e5e5e5] hover:border-secondary hover:text-secondary',
+      'bg-white text-[#0a0a0a] border border-[#e5e5e5] hover:border-secondary hover:text-secondary dark:bg-zinc-900 dark:text-zinc-100 dark:border-zinc-700 dark:hover:border-secondary',
     outline:
       'bg-transparent border border-white text-white hover:bg-white hover:text-[#0a0a0a]',
-    text: 'bg-transparent text-[#0a0a0a] hover:text-secondary px-0 py-2 underline-offset-4 hover:underline',
+    text: 'bg-transparent text-[#0a0a0a] hover:text-secondary dark:text-zinc-100 dark:hover:text-secondary px-0 py-2 underline-offset-4 hover:underline',
   }
 
   if (href) {
