@@ -7,6 +7,7 @@ import { EditorialSection } from './EditorialSection'
 import { CinematicSection } from './CinematicSection'
 import { LuxuryButton } from './ui/LuxuryButton'
 import type { Post } from '@/payload-types'
+import { useUserContext } from '@/context/UserContext'
 
 interface HomepageEditorialProps {
   featuredPosts?: Post[]
@@ -65,7 +66,10 @@ function selectBestPackage(packages: PackageListItem[], nights: number) {
   return best
 }
 
+const DATE_RANGE_STORAGE_KEY = 'plek_date_range_v1'
+
 export function HomepageEditorial({ featuredPosts = [] }: HomepageEditorialProps) {
+  const { currentUser } = useUserContext()
   const posts = featuredPosts
 
   const uniqueCategories = useMemo(() => {
@@ -92,6 +96,72 @@ export function HomepageEditorial({ featuredPosts = [] }: HomepageEditorialProps
     d.setDate(d.getDate() + 2)
     return toISODateInputValue(d)
   })
+
+  // Share date range across the user's journey (home → listing → booking).
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const raw = window.localStorage.getItem(DATE_RANGE_STORAGE_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw) as { fromDate?: string; toDate?: string } | null
+      const nextFrom = typeof parsed?.fromDate === 'string' ? parsed.fromDate : null
+      const nextTo = typeof parsed?.toDate === 'string' ? parsed.toDate : null
+      if (!nextFrom || !nextTo) return
+
+      const from = new Date(nextFrom)
+      const to = new Date(nextTo)
+      if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to <= from) return
+
+      setFromDate(nextFrom)
+      setToDate(nextTo)
+    } catch (err) {
+      console.warn('Failed to hydrate date range from storage', err)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      window.localStorage.setItem(DATE_RANGE_STORAGE_KEY, JSON.stringify({ fromDate, toDate }))
+    } catch (err) {
+      console.warn('Failed to persist date range to storage', err)
+    }
+  }, [fromDate, toDate])
+
+  useEffect(() => {
+    if (!currentUser?.id) return
+    let cancelled = false
+
+    fetch(`/api/estimates/latest?userId=${encodeURIComponent(currentUser.id)}`, { credentials: 'include' })
+      .then(async (res) => {
+        if (!res.ok) return null
+        return (await res.json()) as any
+      })
+      .then((estimate) => {
+        if (cancelled || !estimate) return
+        const nextFrom = estimate?.fromDate
+        const nextTo = estimate?.toDate
+        if (typeof nextFrom !== 'string' || typeof nextTo !== 'string') return
+
+        // The API returns full ISO timestamps; the home inputs want YYYY-MM-DD.
+        const nextFromISO = nextFrom.slice(0, 10)
+        const nextToISO = nextTo.slice(0, 10)
+
+        const from = new Date(nextFromISO)
+        const to = new Date(nextToISO)
+        if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to <= from) return
+
+        setFromDate(nextFromISO)
+        setToDate(nextToISO)
+      })
+      .catch((err) => {
+        console.warn('Failed to load latest estimate for date hydration', err)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [currentUser?.id])
 
   const nights = useMemo(() => diffNights(fromDate, toDate), [fromDate, toDate])
 
@@ -259,7 +329,10 @@ export function HomepageEditorial({ featuredPosts = [] }: HomepageEditorialProps
               const pkgs = postId ? packagesByPostId[postId] || [] : []
               const best = selectBestPackage(pkgs, nights)
 
-              const href = `/posts/${slug}`
+              const href =
+                slug && typeof slug === 'string'
+                  ? `/posts/${encodeURIComponent(slug)}?fromDate=${encodeURIComponent(fromDate)}&toDate=${encodeURIComponent(toDate)}`
+                  : `/posts/${slug}`
 
               const formatZar = (rands: number) => {
                 try {

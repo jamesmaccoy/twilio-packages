@@ -273,6 +273,31 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
   // Latest estimate state
   const [latestEstimate, setLatestEstimate] = useState<any>(null)
   const [loadingEstimate, setLoadingEstimate] = useState(false)
+
+  const dateRangeStorageKey = 'plek_date_range_v1'
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!startDate || !endDate) return
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return
+    if (endDate <= startDate) return
+
+    const toISODate = (d: Date) => {
+      const yyyy = d.getFullYear()
+      const mm = String(d.getMonth() + 1).padStart(2, '0')
+      const dd = String(d.getDate()).padStart(2, '0')
+      return `${yyyy}-${mm}-${dd}`
+    }
+
+    try {
+      window.localStorage.setItem(
+        dateRangeStorageKey,
+        JSON.stringify({ fromDate: toISODate(startDate), toDate: toISODate(endDate) }),
+      )
+    } catch (err) {
+      console.warn('Failed to persist date range to storage', err)
+    }
+  }, [startDate, endDate])
   
   // Checkpoint state for estimate restoration
   interface EstimateCheckpoint {
@@ -874,6 +899,30 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
     
     // Load unavailable dates for the post
     loadUnavailableDates()
+
+    // Hydrate from shared storage (home/editorial) if present, unless we restored a full journey.
+    if (!restored && typeof window !== 'undefined') {
+      try {
+        const raw = window.localStorage.getItem(dateRangeStorageKey)
+        if (raw) {
+          const parsed = JSON.parse(raw) as { fromDate?: string; toDate?: string } | null
+          const fromStr = typeof parsed?.fromDate === 'string' ? parsed.fromDate : null
+          const toStr = typeof parsed?.toDate === 'string' ? parsed.toDate : null
+          if (fromStr && toStr) {
+            const from = new Date(fromStr)
+            const to = new Date(toStr)
+            if (!Number.isNaN(from.getTime()) && !Number.isNaN(to.getTime()) && to > from) {
+              const calcDuration = Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24))
+              setStartDate(from)
+              setEndDate(to)
+              setDuration(calcDuration)
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to hydrate date range from storage', err)
+      }
+    }
     
     // Check for fromDate and toDate URL parameters (from property suggestions)
     const fromDateParam = searchParams?.get('fromDate')
