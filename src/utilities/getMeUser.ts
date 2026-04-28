@@ -6,12 +6,23 @@ import type { User } from '../payload-types'
 import { getPayload } from 'payload'
 import configPromise from '@/payload.config'
 
+type UserPreviewTokenPayload = {
+  type: 'user-preview'
+  userId: string
+  email: string
+}
+
+const PREVIEW_COOKIE_NAME = 'user-preview-token'
+
 export const getMeUser = async (args?: {
   nullUserRedirect?: string
   validUserRedirect?: string
 }): Promise<{
   token: string
   user: User
+  actorUser?: User
+  isPreview?: boolean
+  previewEmail?: string
 }> => {
   const { nullUserRedirect, validUserRedirect } = args || {}
   const cookieStore = await cookies()
@@ -46,6 +57,46 @@ export const getMeUser = async (args?: {
           break
         }
       }
+    }
+
+    // Admin/host "preview as user" mode: swap the returned user based on a short-lived cookie.
+    // This does NOT change the actual session. It only affects the returned user from getMeUser().
+    try {
+      const previewToken = cookieStore.get(PREVIEW_COOKIE_NAME)?.value
+      const actor = user
+      if (previewToken && actor) {
+        const actorRoleValue = (actor as any).role
+        const actorRoleArray = Array.isArray(actorRoleValue)
+          ? actorRoleValue
+          : actorRoleValue
+            ? [actorRoleValue]
+            : []
+        const canPreview = actorRoleArray.includes('admin') || actorRoleArray.includes('host')
+        if (canPreview) {
+          const secret = process.env.JWT_SECRET || payload.secret
+          const decoded = jwt.verify(previewToken, secret) as UserPreviewTokenPayload
+          if (decoded?.type === 'user-preview' && decoded.userId) {
+            const previewUser = (await payload.findByID({
+              collection: 'users',
+              id: String(decoded.userId),
+              overrideAccess: true,
+              depth: 0,
+            })) as User
+            if (previewUser) {
+              return {
+                token: token || '',
+                user: previewUser,
+                actorUser: actor,
+                isPreview: true,
+                previewEmail: decoded.email,
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore invalid/expired preview token and fall back to normal auth user.
+      console.warn('[getMeUser] preview token ignored:', e)
     }
 
     if (!user && authTokens.length > 0) {

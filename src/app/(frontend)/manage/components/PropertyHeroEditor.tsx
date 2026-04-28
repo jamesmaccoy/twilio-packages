@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ImagePlus, Loader2, MoreHorizontal, X } from "lucide-react"
 import {
   Dialog,
@@ -58,6 +59,7 @@ async function uploadMedia(file: File, alt: string): Promise<string> {
 export function PropertyHeroEditor({ postId, onListingDeleted }: PropertyHeroEditorProps) {
   const router = useRouter()
   const fileRef = useRef<HTMLInputElement>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [postTitle, setPostTitle] = useState("")
   const [metaDescription, setMetaDescription] = useState("")
   const [heroMedia, setHeroMedia] = useState<Media | null>(null)
@@ -265,17 +267,46 @@ export function PropertyHeroEditor({ postId, onListingDeleted }: PropertyHeroEdi
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={() => setEditOpen(true)}
-            disabled={loading}
-            aria-label="Edit or delete listing"
-            title="Edit / Delete"
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
+          <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                disabled={loading}
+                aria-label="Listing actions"
+                title="Actions"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-56 p-2">
+              <div className="flex flex-col gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="justify-start"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    setEditOpen(true)
+                  }}
+                >
+                  Edit / Delete
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="justify-start"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    window.open("/manage/preview-user", "_blank", "noopener,noreferrer")
+                  }}
+                >
+                  Preview as user
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 

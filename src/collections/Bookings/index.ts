@@ -480,7 +480,7 @@ export const Booking: CollectionConfig = {
     // },
     delete: ({ req: { user } }) => {
       if (!user) return false
-      const role = user.role
+      const role = (user as any).role
       const roleArray = Array.isArray(role) ? role : role ? [role] : []
       // Only admins and hosts can delete bookings
       return roleArray.includes('admin') || roleArray.includes('host')
@@ -518,7 +518,7 @@ export const Booking: CollectionConfig = {
         // Customers cannot change who the booking belongs to
         update: ({ req: { user } }) => {
           if (!user) return false
-          const role = user.role
+          const role = (user as any).role
           const roleArray = Array.isArray(role) ? role : role ? [role] : []
           return roleArray.includes('admin') || roleArray.includes('host')
         },
@@ -563,6 +563,19 @@ export const Booking: CollectionConfig = {
           type: 'relationship',
           relationTo: 'packages',
           required: false,
+          filterOptions: ({ data, siblingData }: { data?: any; siblingData?: any }) => {
+            // `post` lives on the booking, not inside selectedPackage group
+            const postId = data?.post ?? siblingData?.post
+            if (!postId) return true
+            return {
+              post: {
+                equals: postId,
+              },
+            }
+          },
+          admin: {
+            description: 'Optional. Packages are filtered by the selected property (post).',
+          },
         },
         {
           name: 'customName',

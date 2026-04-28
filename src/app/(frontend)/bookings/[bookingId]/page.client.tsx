@@ -59,6 +59,7 @@ import {
 type Props = {
   data: Booking
   user: User
+  isPreview?: boolean
 }
 
 interface AddonPackage {
@@ -112,9 +113,10 @@ const getQRCodeUrl = (booking: Booking) => {
   return 'https://www.simpleplek.co.za/house-manual'
 }
 
-export default function BookingDetailsClientPage({ data, user }: Props) {
+export default function BookingDetailsClientPage({ data, user, isPreview }: Props) {
   const [removedGuests, setRemovedGuests] = React.useState<string[]>([])
   const router = useRouter()
+  const previewMode = Boolean(isPreview)
 
   const [addonPackages, setAddonPackages] = useState<AddonPackage[]>([])
   const [loadingAddons, setLoadingAddons] = useState(true)
@@ -140,6 +142,15 @@ export default function BookingDetailsClientPage({ data, user }: Props) {
     }[]
   >([])
   const historyKey = React.useMemo(() => (data?.id ? `ai:bookingHistory:${data.id}` : null), [data?.id])
+
+  // Preview banner (admin-only tooling) – keep it simple & non-invasive.
+  // In preview mode we intentionally disable mutating actions.
+  const PreviewBanner = previewMode ? (
+    <div className="mb-4 rounded-lg border border-dashed border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
+      You are viewing this booking in <strong>Preview as customer</strong> mode. Actions like payments, guest changes,
+      and edits are disabled.
+    </div>
+  ) : null
 
 
   useEffect(() => {
@@ -184,6 +195,7 @@ export default function BookingDetailsClientPage({ data, user }: Props) {
   }, [loadingAddons])
 
   const removeGuestHandler = async (guestId: string) => {
+    if (previewMode) return
     const res = await fetch(`/api/bookings/${data.id}/guests/${guestId}`, {
       method: 'DELETE',
       credentials: 'include',
@@ -596,6 +608,7 @@ export default function BookingDetailsClientPage({ data, user }: Props) {
 
   return (
     <div className="min-h-screen bg-background">
+      {PreviewBanner}
       {/* Floating Header */}
       <div className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">

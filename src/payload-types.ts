@@ -196,6 +196,9 @@ export interface Booking {
   guests?: (string | User)[] | null;
   total: number;
   selectedPackage?: {
+    /**
+     * Optional. Packages are filtered by the selected property (post).
+     */
     package?: (string | null) | Package;
     customName?: string | null;
     enabled?: boolean | null;

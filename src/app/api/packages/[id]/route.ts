@@ -65,7 +65,13 @@ export async function PATCH(
   try {
     const { id } = await params
     const payload = await getPayload({ config: configPromise })
-    const { user } = await payload.auth({ headers: request.headers })
+    let user: any = null
+    try {
+      const authResult = await payload.auth({ headers: request.headers })
+      user = authResult.user
+    } catch {
+      user = null
+    }
     
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -155,6 +161,26 @@ export async function PATCH(
         },
         { status: 400 }
       )
+    }
+
+    // Payload admin form state sometimes arrives as `{ state: { field: { value, initialValue, ... }}}`
+    if (body?.state && typeof body.state === 'object' && !Array.isArray(body.state)) {
+      const stateObj = body.state as Record<string, any>
+      for (const [key, fieldState] of Object.entries(stateObj)) {
+        if (fieldState && typeof fieldState === 'object' && 'value' in fieldState) {
+          ;(body as any)[key] = (fieldState as any).value
+        }
+      }
+      delete body.state
+    }
+
+    // Normalize common Payload admin field shapes: { value: ... }
+    const normalizeValue = (v: any) => (v && typeof v === 'object' && 'value' in v ? (v as any).value : v)
+    body = {
+      ...body,
+      post: normalizeValue(body.post),
+      name: normalizeValue(body.name),
+      isEnabled: normalizeValue(body.isEnabled),
     }
     
     // Validate and sanitize the data
@@ -247,7 +273,7 @@ export async function PATCH(
     
     for (const field of allowedFields) {
       if (body[field] !== undefined) {
-        cleanData[field] = body[field]
+        cleanData[field] = normalizeValue(body[field])
       }
     }
     
@@ -286,9 +312,20 @@ export async function PATCH(
     return NextResponse.json(updated)
   } catch (error) {
     console.error('Error updating package:', error)
+    const errAny = error as any
+    const status =
+      typeof errAny?.status === 'number'
+        ? errAny.status
+        : typeof errAny?.httpStatus === 'number'
+          ? errAny.httpStatus
+          : 500
+    const details =
+      errAny?.data ||
+      errAny?.errors ||
+      (errAny instanceof Error ? errAny.message : undefined)
     return NextResponse.json(
-      { error: 'Failed to update package', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
+      { error: 'Failed to update package', details },
+      { status }
     )
   }
 }

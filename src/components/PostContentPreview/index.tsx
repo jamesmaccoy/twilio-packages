@@ -175,17 +175,17 @@ export const PostContentPreview: React.FC<{
             <Lock className="w-6 h-6 text-teal-500 dark:text-teal-400" />
           </div>
           <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-            This post is for subscribers
+            This post is for members only
           </h3>
           <p className="text-slate-500 dark:text-slate-400 mb-6 max-w-sm mx-auto text-sm leading-relaxed">
-            Subscribe to read the full story and get access to all member content, including exclusive retreat offers.
+            Become a member to read the full story and get access to all member content, including exclusive retreat offers.
           </p>
           <div className="flex flex-col items-center gap-3 max-w-xs mx-auto">
             <Link
               href="/subscribe"
               className="w-full bg-teal-500 hover:bg-teal-600 dark:bg-teal-600 dark:hover:bg-teal-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 no-underline"
             >
-              Subscribe — from R25/month
+              Become a member now — from R25/month
               <ChevronRight className="w-4 h-4" />
             </Link>
             <Link
