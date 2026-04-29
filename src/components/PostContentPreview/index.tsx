@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Lock, Clock, User, ChevronRight } from 'lucide-react'
 import { useSubscription } from '@/hooks/useSubscription'
@@ -88,10 +88,41 @@ export const PostContentPreview: React.FC<{
   post: Post
 }> = ({ post }) => {
   const { isSubscribed, isLoading: isSubscriptionLoading } = useSubscription()
+  const [hasGuestPackage, setHasGuestPackage] = useState(false)
 
   // Get content preview for non-subscribers
   const contentPreview = useMemo(() => getContentPreview(post), [post])
-  const showPreview = !isSubscriptionLoading && !isSubscribed && contentPreview.length > 0
+  const showPreview =
+    !isSubscriptionLoading && !isSubscribed && !hasGuestPackage && contentPreview.length > 0
+
+  useEffect(() => {
+    const postId = (post as any)?.id
+    if (!postId) {
+      setHasGuestPackage(false)
+      return
+    }
+
+    let isCancelled = false
+    fetch(`/api/packages/post/${postId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (isCancelled) return
+        const packages = Array.isArray(data?.packages) ? data.packages : []
+        const hasEligibleGuestPackage = packages.some((pkg: any) => {
+          if (!pkg?.isEnabled) return false
+          const category = String(pkg?.category || '').trim().toLowerCase()
+          return category === 'hosted' || category === 'special'
+        })
+        setHasGuestPackage(hasEligibleGuestPackage)
+      })
+      .catch(() => {
+        if (!isCancelled) setHasGuestPackage(false)
+      })
+
+    return () => {
+      isCancelled = true
+    }
+  }, [post])
 
   // Get category label (first category)
   const categoryLabel = post.categories && Array.isArray(post.categories) && post.categories.length > 0

@@ -16,18 +16,17 @@ export async function POST(request: NextRequest) {
 
 		const payload = await getPayload({ config: configPromise })
 
-		// Authenticate and require host/admin if hostContext
+		// Authenticate optionally; only require host/admin when hostContext is true
 		let user: any = null
 		try {
 			const authResult = await payload.auth({ headers: request.headers })
 			user = authResult.user
 		} catch {}
 
-		if (!user) {
-			return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-		}
-
 		if (hostContext) {
+			if (!user) {
+				return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+			}
 			const role: string[] = Array.isArray(user.role) ? user.role : [user.role].filter(Boolean)
 			const isHostOrAdmin = role.includes('host') || role.includes('admin')
 			if (!isHostOrAdmin) {

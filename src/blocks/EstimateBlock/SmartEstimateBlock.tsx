@@ -469,17 +469,19 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
         return false
       }
       
+      const normalizedCategory = String(pkg.category || '').trim().toLowerCase()
+
       // 3-Tier System Implementation:
       
       // Tier 1: Non-subscribers (none) - Only see hosted/special packages (premium experience)
       if (customerEntitlement === 'none') {
-        return ['hosted', 'special'].includes(pkg.category)
+        return ['hosted', 'special'].includes(normalizedCategory)
       }
       
       // Tier 2: Standard subscribers - See standard + hosted + special (better than non-subscribers)
       if (customerEntitlement === 'standard') {
         // Standard subscribers get more than non-subscribers
-        const shouldShow = ['standard', 'hosted', 'special'].includes(pkg.category)
+        const shouldShow = ['standard', 'hosted', 'special'].includes(normalizedCategory)
         
         
         return shouldShow
@@ -1791,7 +1793,8 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
             // Tier 2: Standard subscribers - See standard + hosted + special (better than non-subscribers)
             if (customerEntitlement === 'standard') {
               // Standard subscribers get more than non-subscribers
-              const shouldShow = ['standard', 'hosted', 'special'].includes(pkg.category)
+              const normalizedCategory = String(pkg.category || '').trim().toLowerCase()
+              const shouldShow = ['standard', 'hosted', 'special'].includes(normalizedCategory)
               
               console.log('🔍 Inline Standard subscriber package check:', {
                 packageName: pkg.name,
@@ -3412,11 +3415,6 @@ ${parsedDates.startDate && parsedDates.endDate ? `\nIMPORTANT: User just request
       }
     }
   }, [postId, currentUser?.id])
-  
-  // Hide SmartEstimateBlock for non-subscribers
-  if (!isSubscriptionLoading && !isSubscribed) {
-    return null
-  }
   
   return (
     <div className={cn("w-full max-w-[672px] mx-auto bg-zinc-50 dark:bg-zinc-900 text-slate-950 dark:text-slate-100 shadow-sm border border-zinc-200 dark:border-zinc-700 rounded-lg overflow-hidden flex flex-col h-[800px]", className)}>
