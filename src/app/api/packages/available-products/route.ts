@@ -38,7 +38,8 @@ export async function GET(request: NextRequest) {
 
       const activeTransaction = transactions.docs.find((tx: any) => {
         if (!tx) return false
-        if (!tx.expiresAt) return true
+        // Treat missing expiry as inactive to avoid accidentally granting subscription access.
+        if (!tx.expiresAt) return false
         return new Date(tx.expiresAt) > now
       })
 

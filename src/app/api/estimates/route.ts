@@ -6,6 +6,7 @@ import type { Estimate } from '@/payload-types'
 import { verifyJwtToken } from '@/utilities/token'
 import { getServerSideURL } from '@/utilities/getURL'
 import { getCustomerEntitlement, type CustomerEntitlement } from '@/utils/packageSuggestions'
+import jwt from 'jsonwebtoken'
 
 export async function GET(request: NextRequest) {
   try {
@@ -596,24 +597,75 @@ export async function POST(request: NextRequest) {
       // fall through to cookie token fallback
     }
 
-    // Fallback for sessions where cookie exists but auth header is missing
+    // Fallback: if Payload didn't pick up cookies, try JWT header auth using cookie token.
     if (!user) {
-      const tokenCookie =
-        request.cookies.getAll().find((cookie) => cookie.name.endsWith('-token'))?.value ||
-        request.cookies.get('payload-token')?.value
-      if (tokenCookie) {
-        try {
-          const headersWithToken = new Headers(request.headers)
-          headersWithToken.set('authorization', `JWT ${tokenCookie}`)
-          const tokenAuthResult = await payload.auth({ headers: headersWithToken })
-          user = tokenAuthResult.user
-        } catch {
-          // leave user as null
+      const prefixToken = request.cookies.get(`${payload.config.cookiePrefix}-token`)?.value
+      const legacyToken = request.cookies.get('payload-token')?.value
+      const authTokens = [prefixToken, legacyToken].filter(
+        (token, index, self): token is string => Boolean(token) && self.indexOf(token) === index,
+      )
+
+      if (authTokens.length > 0) {
+        for (const token of authTokens) {
+          try {
+            const headersWithToken = new Headers(request.headers)
+            headersWithToken.set('authorization', `JWT ${token}`)
+            const tokenAuthResult = await payload.auth({ headers: headersWithToken })
+            if (tokenAuthResult.user) {
+              user = tokenAuthResult.user
+              break
+            }
+          } catch {
+            continue
+          }
+        }
+      }
+
+      // Final fallback: directly verify JWT and load user.
+      if (!user && authTokens.length > 0) {
+        for (const token of authTokens) {
+          try {
+            const decoded = jwt.verify(token, payload.secret) as unknown
+            const id =
+              typeof decoded === 'object' && decoded !== null && 'id' in decoded
+                ? (decoded as any).id
+                : null
+            if (typeof id === 'string' && id.length > 0) {
+              user = await payload.findByID({
+                collection: 'users',
+                id,
+                overrideAccess: true,
+              })
+              break
+            }
+          } catch {
+            continue
+          }
         }
       }
     }
 
     if (!user) {
+      // Dev-only: return auth debugging signals to quickly diagnose missing cookies/headers.
+      if (process.env.NODE_ENV === 'development') {
+        const tokenCookieName =
+          request.cookies.getAll().find((cookie) => cookie.name.endsWith('-token'))?.name ||
+          (request.cookies.get('payload-token') ? 'payload-token' : null)
+        const hasAuthHeader = Boolean(request.headers.get('authorization'))
+        const hasCookieHeader = Boolean(request.headers.get('cookie'))
+        return NextResponse.json(
+          {
+            error: 'Unauthorized',
+            debug: {
+              hasAuthHeader,
+              hasCookieHeader,
+              tokenCookieName,
+              cookieNames: request.cookies.getAll().map((c) => c.name),
+            },
+          },
+          { status: 401 },
+        )
+      }
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

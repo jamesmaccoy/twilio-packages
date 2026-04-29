@@ -42,7 +42,8 @@ export async function GET(
 
       const activeTransaction = transactions.docs.find((tx: any) => {
         if (!tx) return false
-        if (!tx.expiresAt) return true
+        // Treat missing expiry as inactive to avoid accidentally granting subscription access.
+        if (!tx.expiresAt) return false
         return new Date(tx.expiresAt) > now
       })
 
@@ -313,16 +314,18 @@ export async function GET(
           return false
         }
         
+        const normalizedCategory = String(pkg.category || '').trim().toLowerCase()
+
         // Filter packages based on customer entitlement (3-Tier System):
-        // Tier 1: Non-subscribers (none) - Guests should still see standard packages on public pages.
+        // Tier 1: Non-subscribers (none) - Only see hosted/special packages.
         if (customerEntitlement === 'none') {
-          const shouldInclude = ['standard', 'hosted', 'special'].includes(String(pkg.category || ''))
+          const shouldInclude = ['hosted', 'special'].includes(normalizedCategory)
           if (pkg.id === '68a587e7420e4517de8d2b2d') {
             console.log('🔍 Package entitlement check (none):', {
               packageId: pkg.id,
-              category: pkg.category,
+              category: normalizedCategory,
               shouldInclude,
-              allowedCategories: ['standard', 'hosted', 'special']
+              allowedCategories: ['hosted', 'special']
             })
           }
           return shouldInclude
@@ -330,7 +333,7 @@ export async function GET(
         
         // Tier 2: Standard subscribers - See standard + hosted + special (better than non-subscribers)
         if (customerEntitlement === 'standard') {
-          return ['standard', 'hosted', 'special'].includes(String(pkg.category || ''))
+          return ['standard', 'hosted', 'special'].includes(normalizedCategory)
         }
         
         // Tier 3: Pro subscribers - See everything (all packages)
