@@ -1218,6 +1218,7 @@ export default function BookingDetailsClientPage({ data, user, isPreview }: Prop
 
                     const resp = await fetch('/api/estimates', {
                       method: 'POST',
+                      credentials: 'include',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({
                         postId,

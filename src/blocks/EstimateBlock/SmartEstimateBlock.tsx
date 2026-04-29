@@ -1454,6 +1454,7 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
       
       const estimateResponse = await fetch('/api/estimates', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -1731,6 +1732,7 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
       // Always create/update estimate with current dates to ensure correct dates are shown
       const resp = await fetch('/api/estimates', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           postId,
@@ -2456,6 +2458,7 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
             
             const estimateResponse = await fetch('/api/estimates', {
               method: 'POST',
+              credentials: 'include',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 postId,
@@ -2509,6 +2512,7 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
             
             const estimateResponse = await fetch('/api/estimates', {
               method: 'POST',
+              credentials: 'include',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 postId,

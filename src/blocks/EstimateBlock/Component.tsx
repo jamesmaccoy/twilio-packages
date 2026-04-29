@@ -397,6 +397,7 @@ export const EstimateBlock: React.FC<EstimateBlockProps> = ({
           }
           const res = await fetch('/api/estimates', {
             method: 'POST',
+            credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               postId,

@@ -5,6 +5,7 @@ import { yocoService } from '@/lib/yocoService'
 import type { Estimate } from '@/payload-types'
 import { verifyJwtToken } from '@/utilities/token'
 import { getServerSideURL } from '@/utilities/getURL'
+import { getCustomerEntitlement, type CustomerEntitlement } from '@/utils/packageSuggestions'
 
 export async function GET(request: NextRequest) {
   try {
@@ -587,7 +588,31 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const payload = await getPayload({ config: configPromise })
-    const { user } = await payload.auth({ headers: request.headers })
+    let user: any = null
+    try {
+      const authResult = await payload.auth({ headers: request.headers })
+      user = authResult.user
+    } catch {
+      // fall through to cookie token fallback
+    }
+
+    // Fallback for sessions where cookie exists but auth header is missing
+    if (!user) {
+      const tokenCookie =
+        request.cookies.getAll().find((cookie) => cookie.name.endsWith('-token'))?.value ||
+        request.cookies.get('payload-token')?.value
+      if (tokenCookie) {
+        try {
+          const headersWithToken = new Headers(request.headers)
+          headersWithToken.set('authorization', `JWT ${tokenCookie}`)
+          const tokenAuthResult = await payload.auth({ headers: headersWithToken })
+          user = tokenAuthResult.user
+        } catch {
+          // leave user as null
+        }
+      }
+    }
+
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -963,6 +988,53 @@ export async function POST(request: NextRequest) {
         error: 'Package not found', 
         details: `Package ${effectivePackageType} not found in database or Yoco products for post ${postId}` 
       }, { status: 400 })
+    }
+
+    // Enforce entitlement server-side so protected package tiers are not selectable by non-entitled users.
+    const now = new Date()
+    const transactions = await payload.find({
+      collection: 'yoco-transactions',
+      where: {
+        and: [
+          { user: { equals: user.id } },
+          { status: { equals: 'completed' } },
+          { intent: { equals: 'subscription' } },
+        ],
+      },
+      sort: '-completedAt',
+      limit: 10,
+    })
+    const activeTransaction = transactions.docs.find((tx: any) => {
+      if (!tx) return false
+      if (!tx.expiresAt) return true
+      return new Date(tx.expiresAt) > now
+    })
+    const subscriptionStatus = {
+      isSubscribed: Boolean(activeTransaction),
+      entitlements: activeTransaction?.entitlement ? [activeTransaction.entitlement] : [],
+      expirationDate: activeTransaction?.expiresAt ? new Date(activeTransaction.expiresAt) : null,
+      isLoading: false,
+      error: null,
+    }
+    const customerEntitlement = getCustomerEntitlement(subscriptionStatus)
+    const normalizedCategory = String((pkg as any).category || '').trim().toLowerCase()
+
+    const isPackageAllowedForEntitlement = (entitlement: CustomerEntitlement): boolean => {
+      if (entitlement === 'pro') return true
+      if (entitlement === 'standard') {
+        return ['standard', 'hosted', 'special'].includes(normalizedCategory)
+      }
+      return ['hosted', 'special'].includes(normalizedCategory)
+    }
+
+    if (!isPackageAllowedForEntitlement(customerEntitlement)) {
+      return NextResponse.json(
+        {
+          error: 'Package requires a higher entitlement',
+          details: `Package category '${normalizedCategory || 'unknown'}' is not available for '${customerEntitlement}' users`,
+        },
+        { status: 403 },
+      )
     }
 
     const duration = fromDate && toDate
