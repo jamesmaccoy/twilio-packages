@@ -114,6 +114,15 @@ export default function MobileOnboardingClient() {
                   onChange={(event) => setCountryCode(event.target.value)}
                 >
                   <option value="+27">South Africa (+27)</option>
+                  <option value="+1">United States / Canada (+1)</option>
+                  <option value="+44">United Kingdom (+44)</option>
+                  <option value="+49">Germany (+49)</option>
+                  <option value="+33">France (+33)</option>
+                  <option value="+34">Spain (+34)</option>
+                  <option value="+39">Italy (+39)</option>
+                  <option value="+31">Netherlands (+31)</option>
+                  <option value="+61">Australia (+61)</option>
+                  <option value="+353">Ireland (+353)</option>
                 </select>
                 <Input
                   id="mobile-number"

@@ -72,9 +72,6 @@ export default function LoginPage() {
 
           {/* Footer */}
           <div className="mt-6 space-y-3">
-            <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
-              New here? Continue with email, mobile, or Google and we&apos;ll create your account if needed.
-            </p>
             <p className="text-center text-xs text-zinc-400 dark:text-zinc-500">
               By continuing, you agree to our{' '}
               <Link

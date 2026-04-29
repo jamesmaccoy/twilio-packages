@@ -238,85 +238,10 @@ export default function EmailAuthForm() {
       {step === 'identifier' && (
         <form onSubmit={form.handleSubmit(handleIdentifier)} className="grid gap-4">
           {error && <div className="bg-red-100 text-red-700 p-3 rounded-md">{error}</div>}
-          <div className="grid gap-2">
-           
-            <div className="flex gap-2">
-              {showCountryCode && (
-                <select
-                  aria-label="Country code"
-                  {...form.register('countryCode', { required: true })}
-                  className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2"
-                >
-                  <option value="+27">South Africa (+27)</option>
-                  <option value="+1">United States / Canada (+1)</option>
-                  <option value="+44">United Kingdom (+44)</option>
-                  <option value="+49">Germany (+49)</option>
-                  <option value="+33">France (+33)</option>
-                  <option value="+34">Spain (+34)</option>
-                  <option value="+39">Italy (+39)</option>
-                  <option value="+31">Netherlands (+31)</option>
-                  <option value="+61">Australia (+61)</option>
-                  <option value="+353">Ireland (+353)</option>
-                </select>
-              )}
-              <Input
-                id="identifier"
-                type="text"
-                placeholder="Phone number or email"
-                autoComplete="username"
-                autoCapitalize="none"
-                autoCorrect="off"
-                {...form.register('identifier', { required: true })}
-                className="flex h-10 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              />
-            </div>
-          </div>
-          <Button
-            className="w-full mt-2 h-10"
-            type="submit"
-            disabled={loading}
-            variant="default"
-          >
-            {loading ? (
-              <span className="flex items-center gap-2">
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                Sending...
-              </span>
-            ) : (
-              'Continue'
-            )}
-          </Button>
+         
 
           <Button
             type="button"
-            variant="outline"
-            className="w-full h-10"
-            onClick={() => {
-              const identifier = String(form.getValues('identifier') || '').trim()
-              if (!isEmailIdentifier(identifier)) {
-                setError('Enter your email above to use password login.')
-                return
-              }
-              setEmail(identifier.toLowerCase())
-              setStep('password')
-              setError(null)
-            }}
-          >
-            Use password instead
-          </Button>
-
-          <div className="relative my-1">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-zinc-200" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-zinc-500">or</span>
-            </div>
-          </div>
-
-          <Button
-            type="button"
-            variant="outline"
             className="w-full h-10"
             onClick={() => {
               const validatedNext = validateRedirect(next)
@@ -330,7 +255,66 @@ export default function EmailAuthForm() {
                 fill="currentColor"
               />
             </svg>
-            Sign in with Google
+            Continue with Google
+          </Button>
+
+          <div className="relative my-1">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-zinc-200" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-2 text-zinc-500">or use email / mobile</span>
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+           
+           <div className="flex gap-2">
+             {showCountryCode && (
+               <select
+                 aria-label="Country code"
+                 {...form.register('countryCode', { required: true })}
+                 className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2"
+               >
+                 <option value="+27">South Africa (+27)</option>
+                 <option value="+1">United States / Canada (+1)</option>
+                 <option value="+44">United Kingdom (+44)</option>
+                 <option value="+49">Germany (+49)</option>
+                 <option value="+33">France (+33)</option>
+                 <option value="+34">Spain (+34)</option>
+                 <option value="+39">Italy (+39)</option>
+                 <option value="+31">Netherlands (+31)</option>
+                 <option value="+61">Australia (+61)</option>
+                 <option value="+353">Ireland (+353)</option>
+               </select>
+             )}
+             <Input
+               id="identifier"
+               type="text"
+               placeholder="Phone number or email"
+               autoComplete="username"
+               autoCapitalize="none"
+               autoCorrect="off"
+               {...form.register('identifier', { required: true })}
+               className="flex h-10 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+             />
+           </div>
+         </div>
+
+          <Button
+            className="w-full h-10"
+            type="submit"
+            disabled={loading}
+            variant="outline"
+          >
+            {loading ? (
+              <span className="flex items-center gap-2">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                Sending...
+              </span>
+            ) : (
+              'Continue'
+            )}
           </Button>
         </form>
       )}
