@@ -118,7 +118,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
     setError(null)
     setSuccess(null)
     try {
-      const res = await fetch(`/api/packages/${pkg.id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/packages/${pkg.id}`, { method: 'DELETE', credentials: 'include' })
       if (!res.ok) {
         const data = await res.json().catch(() => null)
         throw new Error(data?.error || `Failed to delete package (HTTP ${res.status})`)
@@ -140,8 +140,8 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
     try {
       // Load both packages and post data
       const [packagesRes, postRes] = await Promise.all([
-        fetch(`/api/packages?where[post][equals]=${postId}`),
-        fetch(`/api/posts/${postId}`)
+        fetch(`/api/packages?where[post][equals]=${postId}`, { credentials: 'include' }),
+        fetch(`/api/posts/${postId}`, { credentials: 'include' })
       ]);
 
       if (!packagesRes.ok) throw new Error('Failed to load packages');

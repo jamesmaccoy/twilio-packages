@@ -255,6 +255,7 @@ export async function GET(
           description: pkg.description,
           multiplier: pkg.multiplier,
           category: pkg.category,
+          entitlement: (pkg as any).entitlement ?? null,
           minNights: pkg.minNights,
           maxNights: pkg.maxNights,
           revenueCatId: pkg.revenueCatId, // Keep for backward compatibility
@@ -277,6 +278,7 @@ export async function GET(
           description: product.description,
           multiplier: 1, // Default multiplier for Yoco products
           category: product.category,
+          entitlement: (product as any).entitlement ?? null,
           minNights: nights,
           maxNights: nights,
           revenueCatId: product.id, // Keep for backward compatibility
@@ -315,6 +317,22 @@ export async function GET(
         }
         
         const normalizedCategory = String(pkg.category || '').trim().toLowerCase()
+        const requiredEntitlementRaw = (pkg as any).entitlement
+        const requiredEntitlement =
+          requiredEntitlementRaw === 'none' || requiredEntitlementRaw == null
+            ? null
+            : String(requiredEntitlementRaw)
+
+        const meetsExplicitEntitlement = (() => {
+          if (!requiredEntitlement) return true
+          if (requiredEntitlement === 'pro') return customerEntitlement === 'pro'
+          if (requiredEntitlement === 'standard')
+            return customerEntitlement === 'standard' || customerEntitlement === 'pro'
+          // Unknown entitlement value: be safe and hide from lower tiers
+          return customerEntitlement === 'pro'
+        })()
+
+        if (!meetsExplicitEntitlement) return false
 
         // Filter packages based on customer entitlement (3-Tier System):
         // Tier 1: Non-subscribers (none) - Only see hosted/special packages.

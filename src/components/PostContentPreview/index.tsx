@@ -108,11 +108,9 @@ export const PostContentPreview: React.FC<{
       .then((data) => {
         if (isCancelled) return
         const packages = Array.isArray(data?.packages) ? data.packages : []
-        const hasEligibleGuestPackage = packages.some((pkg: any) => {
-          if (!pkg?.isEnabled) return false
-          const category = String(pkg?.category || '').trim().toLowerCase()
-          return category === 'hosted' || category === 'special'
-        })
+        // This endpoint already filters based on the current user's entitlement (or 'none' for guests).
+        // If *any* package is returned, guests have something bookable and we should hide the member-only gate.
+        const hasEligibleGuestPackage = packages.some((pkg: any) => Boolean(pkg?.isEnabled))
         setHasGuestPackage(hasEligibleGuestPackage)
       })
       .catch(() => {

@@ -64,6 +64,7 @@ const Packages: CollectionConfig = {
       name: 'entitlement',
       type: 'select',
       options: [
+        { label: 'None', value: 'none' },
         { label: 'Standard', value: 'standard' },
         { label: 'Pro', value: 'pro' },
       ],

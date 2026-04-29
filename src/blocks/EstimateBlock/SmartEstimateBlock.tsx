@@ -46,7 +46,7 @@ interface Package {
   description: string
   multiplier: number
   category: string
-  entitlement?: 'standard' | 'pro'
+  entitlement?: 'none' | 'standard' | 'pro'
   minNights: number
   maxNights: number
   yocoId?: string
@@ -3419,6 +3419,13 @@ ${parsedDates.startDate && parsedDates.endDate ? `\nIMPORTANT: User just request
       }
     }
   }, [postId, currentUser?.id])
+
+  // For non-subscribers, only show the assistant if there is at least one guest-eligible package.
+  // (Otherwise we end up showing both the subscriber gate and this assistant.)
+  if (!isSubscriptionLoading && !isSubscribed) {
+    if (!loadedRef.current) return null
+    if (packages.length === 0) return null
+  }
   
   return (
     <div className={cn("w-full max-w-[672px] mx-auto bg-zinc-50 dark:bg-zinc-900 text-slate-950 dark:text-slate-100 shadow-sm border border-zinc-200 dark:border-zinc-700 rounded-lg overflow-hidden flex flex-col h-[800px]", className)}>
