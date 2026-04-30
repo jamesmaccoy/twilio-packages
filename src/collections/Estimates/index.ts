@@ -6,6 +6,7 @@ import type { CollectionConfig } from 'payload'
 import { adminOrSelfOrGuests } from '../Bookings/access/adminOrSelfOrGuests'
 import { generateJwtToken, verifyJwtToken, generateShortToken } from '@/utilities/token'
 import { trackEstimateCreated, trackGuestJoined } from '@/lib/metaConversions'
+import jwt from 'jsonwebtoken'
 
 export const Estimate: CollectionConfig = {
   slug: 'estimates',
@@ -27,7 +28,46 @@ export const Estimate: CollectionConfig = {
       path: '/:estimateId/token',
       method: 'post',
       handler: async (req) => {
-        if (!req.user) {
+        const getCookieValue = (cookieHeader: string, name: string): string | null => {
+          const parts = cookieHeader.split(';').map((p) => p.trim())
+          for (const part of parts) {
+            if (!part) continue
+            const idx = part.indexOf('=')
+            if (idx <= 0) continue
+            const k = part.slice(0, idx).trim()
+            const v = part.slice(idx + 1)
+            if (k === name) return decodeURIComponent(v)
+          }
+          return null
+        }
+
+        // Some runtimes don't populate req.user for legacy cookies.
+        // Fallback to reading the auth token cookie and loading the user.
+        let actorUser = req.user
+        if (!actorUser) {
+          try {
+            const cookieHeader = typeof req.headers?.get === 'function' ? req.headers.get('cookie') : null
+            const cookiePrefix = (req.payload as any)?.config?.cookiePrefix
+            const prefixToken =
+              cookieHeader && cookiePrefix ? getCookieValue(cookieHeader, `${cookiePrefix}-token`) : null
+            const legacyToken = cookieHeader ? getCookieValue(cookieHeader, 'payload-token') : null
+            const token = prefixToken || legacyToken
+            if (token) {
+              const decoded = jwt.verify(token, req.payload.secret) as any
+              const id = decoded && typeof decoded === 'object' ? decoded.id : null
+              if (typeof id === 'string' && id.length > 0) {
+                actorUser = await req.payload.findByID({
+                  collection: 'users',
+                  id,
+                  overrideAccess: true,
+                  depth: 0,
+                })
+              }
+            }
+          } catch {}
+        }
+
+        if (!actorUser) {
           return Response.json(
             {
               message: 'Unauthorized',
@@ -82,8 +122,8 @@ export const Estimate: CollectionConfig = {
           const isAdminOrHost = roleArray.includes('admin') || roleArray.includes('host')
           const isCustomer =
             typeof estimate.customer === 'string'
-              ? estimate.customer === req.user.id
-              : estimate.customer?.id === req.user.id
+              ? estimate.customer === actorUser.id
+              : estimate.customer?.id === actorUser.id
 
           // Check if user is authorized (customer OR admin/host)
           if (!isCustomer && !isAdminOrHost) {
@@ -133,7 +173,44 @@ export const Estimate: CollectionConfig = {
       path: '/:estimateId/refresh-token',
       method: 'post',
       handler: async (req) => {
-        if (!req.user) {
+        const getCookieValue = (cookieHeader: string, name: string): string | null => {
+          const parts = cookieHeader.split(';').map((p) => p.trim())
+          for (const part of parts) {
+            if (!part) continue
+            const idx = part.indexOf('=')
+            if (idx <= 0) continue
+            const k = part.slice(0, idx).trim()
+            const v = part.slice(idx + 1)
+            if (k === name) return decodeURIComponent(v)
+          }
+          return null
+        }
+
+        let actorUser = req.user
+        if (!actorUser) {
+          try {
+            const cookieHeader = typeof req.headers?.get === 'function' ? req.headers.get('cookie') : null
+            const cookiePrefix = (req.payload as any)?.config?.cookiePrefix
+            const prefixToken =
+              cookieHeader && cookiePrefix ? getCookieValue(cookieHeader, `${cookiePrefix}-token`) : null
+            const legacyToken = cookieHeader ? getCookieValue(cookieHeader, 'payload-token') : null
+            const token = prefixToken || legacyToken
+            if (token) {
+              const decoded = jwt.verify(token, req.payload.secret) as any
+              const id = decoded && typeof decoded === 'object' ? decoded.id : null
+              if (typeof id === 'string' && id.length > 0) {
+                actorUser = await req.payload.findByID({
+                  collection: 'users',
+                  id,
+                  overrideAccess: true,
+                  depth: 0,
+                })
+              }
+            }
+          } catch {}
+        }
+
+        if (!actorUser) {
           return Response.json(
             {
               message: 'Unauthorized',
@@ -155,7 +232,7 @@ export const Estimate: CollectionConfig = {
           )
         }
 
-        const roleValue = (req.user as any)?.role
+        const roleValue = (actorUser as any)?.role
         const roleArray = Array.isArray(roleValue) ? roleValue : roleValue ? [roleValue] : []
         const isAdminOrHost = roleArray.includes('admin') || roleArray.includes('host')
 
@@ -176,7 +253,7 @@ export const Estimate: CollectionConfig = {
                   },
                   {
                     customer: {
-                      equals: req.user.id,
+                      equals: actorUser.id,
                     },
                   },
                 ],
