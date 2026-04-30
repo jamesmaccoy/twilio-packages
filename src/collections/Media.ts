@@ -18,7 +18,8 @@ const dirname = path.dirname(filename)
 export const Media: CollectionConfig = {
   slug: 'media',
   access: {
-    create: adminOrHost,
+    // Allow any logged-in user to upload media (needed for Manage flows).
+    create: authenticated,
     delete: adminOrHost,
     read: anyone,
     update: adminOrHost,
