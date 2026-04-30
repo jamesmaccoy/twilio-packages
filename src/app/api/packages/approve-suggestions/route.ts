@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import configPromise from '@/payload.config'
 import { BASE_PACKAGE_TEMPLATES } from '@/lib/package-types'
+import jwt from 'jsonwebtoken'
 
 type Suggestion = {
   revenueCatId?: string
@@ -48,7 +49,7 @@ function resolveSuggestionFields(s: Suggestion) {
   const multiplier = Number.isFinite(multiplierRaw) ? Math.min(3, Math.max(0.1, multiplierRaw)) : 1
 
   const tierRaw = String(d.customerTierRequired || tpl?.customerTierRequired || 'standard').toLowerCase()
-  const entitlement = tierRaw.includes('pro') ? 'pro' : 'standard'
+  const entitlement = tierRaw.includes('pro') ? ('pro' as const) : ('standard' as const)
 
   return { minNights, maxNights, category, multiplier, entitlement }
 }
@@ -62,6 +63,52 @@ export async function POST(req: NextRequest) {
       const authResult = await payload.auth({ headers: req.headers })
       user = authResult.user
     } catch {}
+
+    // Fallback: if Payload didn't pick up cookies, try JWT auth using cookie token.
+    const prefixToken = req.cookies.get(`${payload.config.cookiePrefix}-token`)?.value
+    const legacyToken = req.cookies.get('payload-token')?.value
+    const authTokens = [prefixToken, legacyToken].filter(
+      (token, index, self): token is string => Boolean(token) && self.indexOf(token) === index,
+    )
+
+    if (!user && authTokens.length > 0) {
+      for (const token of authTokens) {
+        try {
+          const headersWithToken = new Headers(req.headers)
+          headersWithToken.set('authorization', `JWT ${token}`)
+          const tokenAuthResult = await payload.auth({ headers: headersWithToken })
+          if (tokenAuthResult.user) {
+            user = tokenAuthResult.user
+            break
+          }
+        } catch {
+          continue
+        }
+      }
+    }
+
+    // Final fallback: directly verify JWT and load user.
+    if (!user && authTokens.length > 0) {
+      for (const token of authTokens) {
+        try {
+          const decoded = jwt.verify(token, payload.secret) as unknown
+          const id =
+            typeof decoded === 'object' && decoded !== null && 'id' in decoded
+              ? (decoded as any).id
+              : null
+          if (typeof id === 'string' && id.length > 0) {
+            user = await payload.findByID({
+              collection: 'users',
+              id,
+              overrideAccess: true,
+            })
+            break
+          }
+        } catch {
+          continue
+        }
+      }
+    }
 
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
