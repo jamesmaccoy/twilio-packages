@@ -77,12 +77,16 @@ export const Estimate: CollectionConfig = {
             }
           }
 
-          // Check if user is authorized
-          if (
+          const roleValue = (req.user as any)?.role
+          const roleArray = Array.isArray(roleValue) ? roleValue : roleValue ? [roleValue] : []
+          const isAdminOrHost = roleArray.includes('admin') || roleArray.includes('host')
+          const isCustomer =
             typeof estimate.customer === 'string'
-              ? estimate.customer !== req.user.id
-              : estimate.customer?.id !== req.user.id
-          ) {
+              ? estimate.customer === req.user.id
+              : estimate.customer?.id === req.user.id
+
+          // Check if user is authorized (customer OR admin/host)
+          if (!isCustomer && !isAdminOrHost) {
             return Response.json(
               {
                 message: 'Unauthorized',
@@ -151,22 +155,32 @@ export const Estimate: CollectionConfig = {
           )
         }
 
+        const roleValue = (req.user as any)?.role
+        const roleArray = Array.isArray(roleValue) ? roleValue : roleValue ? [roleValue] : []
+        const isAdminOrHost = roleArray.includes('admin') || roleArray.includes('host')
+
         const estimates = await req.payload.find({
           collection: 'estimates',
-          where: {
-            and: [
-              {
+          where: isAdminOrHost
+            ? {
                 id: {
                   equals: _estimateId,
                 },
+              }
+            : {
+                and: [
+                  {
+                    id: {
+                      equals: _estimateId,
+                    },
+                  },
+                  {
+                    customer: {
+                      equals: req.user.id,
+                    },
+                  },
+                ],
               },
-              {
-                customer: {
-                  equals: req.user.id,
-                },
-              },
-            ],
-          },
           limit: 1,
           pagination: false,
         })

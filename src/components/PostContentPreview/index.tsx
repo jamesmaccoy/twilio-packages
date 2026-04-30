@@ -207,7 +207,7 @@ export const PostContentPreview: React.FC<{
             This plek is for members only
           </h3>
           <p className="text-slate-500 dark:text-slate-400 mb-6 max-w-sm mx-auto text-sm leading-relaxed">
-            Become a member to get access to other packages, including booking longer stays and hikes or wines.
+            Become a member to get access to other packages, including booking longer stays and hikes & wine/soaps.
           </p>
           <div className="flex flex-col items-center gap-3 max-w-xs mx-auto">
             <Link
