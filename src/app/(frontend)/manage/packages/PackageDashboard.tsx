@@ -611,7 +611,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
               className="border-slate-300 dark:border-border shadow-sm text-slate-700 dark:text-foreground bg-white dark:bg-card hover:bg-slate-50 dark:hover:bg-muted"
             >
               <Sparkles className="w-4 h-4 mr-2" />
-              Create New Package
+              New Package
             </Button>
             {packages.length > 0 && (
               <Button
