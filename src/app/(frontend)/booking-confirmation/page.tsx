@@ -9,6 +9,7 @@ import { format } from 'date-fns'
 import { DivineLightEffect } from '@/components/DivineLightEffect'
 import { Package } from 'lucide-react'
 import { trackBookingConversion } from '@/lib/metaConversions'
+import { getMeUser } from '@/utilities/getMeUser'
 
 export default async function BookingConfirmationPage({
   searchParams,
@@ -17,17 +18,16 @@ export default async function BookingConfirmationPage({
 }) {
   const resolvedSearchParams = await searchParams
   
-  // Get the current user
+  // Preserve the current URL path and query params for redirect after login
+  const currentPath = '/booking-confirmation'
+  const queryString = new URLSearchParams(resolvedSearchParams as Record<string, string>).toString()
+  const redirectUrl = queryString ? `${currentPath}?${queryString}` : currentPath
+
+  // Get the current user (robust cookie/JWT fallback)
   const payload = await getPayload({ config: configPromise })
-  const { user } = await payload.auth({ headers: await headers() })
-  
-  if (!user) {
-    // Preserve the current URL path and query params for redirect after login
-    const currentPath = '/booking-confirmation'
-    const queryString = new URLSearchParams(resolvedSearchParams as Record<string, string>).toString()
-    const redirectUrl = queryString ? `${currentPath}?${queryString}` : currentPath
-    redirect(`/login?redirect=${encodeURIComponent(redirectUrl)}`)
-  }
+  const { user } = await getMeUser({
+    nullUserRedirect: `/login?redirect=${encodeURIComponent(redirectUrl)}`,
+  })
 
   // Handle payment success callback - create booking if estimate ID is provided
   const success = resolvedSearchParams.success === 'true'
