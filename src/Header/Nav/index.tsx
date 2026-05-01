@@ -22,8 +22,17 @@ export const HeaderNav: React.FC<{ data: HeaderType }> = ({ data }) => {
   const subscriptionStatus = useSubscription()
   const customerEntitlement = getCustomerEntitlement(subscriptionStatus)
 
-  // Check if user has standard or pro entitlement, or is admin
-  const canManagePlek = customerEntitlement === 'standard' || customerEntitlement === 'pro' || currentUser?.role?.includes('admin')
+  const roleValue = (currentUser as any)?.role
+  const roleArray = Array.isArray(roleValue) ? roleValue : roleValue ? [roleValue] : []
+  const isAdminOrHost = roleArray.includes('admin') || roleArray.includes('host')
+
+  // Pro customers should see Manage even if the subscription hook hasn't resolved yet.
+  const userPlan = (currentUser as any)?.subscriptionStatus?.plan as string | undefined
+  const hasPaidPlan = userPlan === 'basic' || userPlan === 'pro' || userPlan === 'enterprise'
+
+  // Check if user has standard/pro entitlement, paid plan, or is admin/host
+  const canManagePlek =
+    isAdminOrHost || customerEntitlement === 'standard' || customerEntitlement === 'pro' || hasPaidPlan
 
   const stopPreview = async () => {
     try {

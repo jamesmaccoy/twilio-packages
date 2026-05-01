@@ -7,7 +7,15 @@ import { Badge } from '@/components/ui/badge'
 import { motion } from 'framer-motion'
 import { Loader2 } from 'lucide-react'
 import type { YocoProduct } from '@/lib/yocoService'
-import type { TokenUsageSummary } from '@/app/(frontend)/subscribe/page'
+
+type TokenUsageSummary = {
+  total: number | null
+  prompt: number | null
+  candidates: number | null
+  cached: number | null
+  thoughts: number | null
+  timestamp: number
+}
 
 type PricingSectionProps = {
   standardProduct?: YocoProduct
@@ -187,7 +195,7 @@ export function PricingSection({
                     R{proProduct.price.toFixed(2)}
                   </span>
                   <span className="ml-2 text-sm text-slate-500">
-                    / {proProduct.period}
+                    / month
                   </span>
                 </div>
                 <div className="mt-2 flex items-center gap-2 rounded bg-slate-50 px-3 py-2 text-sm text-slate-600">
