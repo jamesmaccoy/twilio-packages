@@ -6,7 +6,7 @@ type IncomingEvent = {
   event: 'RENEWED' | 'CANCELED' | 'TRIAL_ENDED' | 'INITIAL_PURCHASE' | 'EXPIRED'
   userId: string
   transactionId?: string
-  plan?: 'standard' | 'pro'
+  plan?: 'standard' | 'pro' | 'free' | 'basic' | 'enterprise'
   entitlement?: 'none' | 'standard' | 'pro'
   expiresAt?: string
 }
@@ -24,6 +24,20 @@ export async function POST(request: NextRequest) {
           throw new Error('Invalid event payload: missing event or userId')
         }
 
+        const normalizedPlan: 'free' | 'basic' | 'pro' | 'enterprise' | undefined = event.plan
+          ? event.plan === 'pro'
+            ? 'pro'
+            : event.plan === 'standard'
+              ? 'basic'
+              : event.plan === 'basic' || event.plan === 'enterprise' || event.plan === 'free'
+                ? event.plan
+                : 'free'
+          : event.entitlement === 'pro'
+            ? 'pro'
+            : event.entitlement === 'standard'
+              ? 'basic'
+              : undefined
+
         await payload.jobs.queue({
           task: 'handleSubscriptionEvent',
           queue: 'subscription-events',
@@ -31,7 +45,7 @@ export async function POST(request: NextRequest) {
             event: event.event,
             userId: event.userId,
             transactionId: event.transactionId,
-            plan: event.plan,
+            plan: normalizedPlan,
             entitlement: event.entitlement,
             expiresAt: event.expiresAt,
           },

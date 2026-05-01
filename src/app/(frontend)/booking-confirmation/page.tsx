@@ -11,6 +11,19 @@ import { Package } from 'lucide-react'
 import { trackBookingConversion } from '@/lib/metaConversions'
 import { getMeUser } from '@/utilities/getMeUser'
 
+function toRoleArray(role: unknown): string[] {
+  if (Array.isArray(role)) return role.filter((r): r is string => typeof r === 'string')
+  if (typeof role === 'string' && role.trim()) return [role.trim()]
+  return []
+}
+
+function subscriptionMembershipLabel(plan: string, entitlement?: string | null): string {
+  if (plan === 'pro' || entitlement === 'pro') return 'Pro'
+  if (plan === 'basic' || entitlement === 'standard') return 'Standard'
+  if (plan && plan !== 'free') return plan.charAt(0).toUpperCase() + plan.slice(1)
+  return 'Member'
+}
+
 export default async function BookingConfirmationPage({
   searchParams,
 }: {
@@ -41,7 +54,7 @@ export default async function BookingConfirmationPage({
   const isSubscriptionIntent = intentParam === 'subscription'
 
   let activatedSubscription: {
-    packageName: string
+    membershipLabel: string
     amount: number | null
     currency: string
     plan: string
@@ -56,6 +69,7 @@ export default async function BookingConfirmationPage({
       })
 
       if (transaction) {
+        const wasCompleted = transaction.status === 'completed'
         const transactionUserId =
           typeof transaction.user === 'string' ? transaction.user : transaction.user?.id
 
@@ -127,10 +141,32 @@ export default async function BookingConfirmationPage({
           }
 
           if (transaction.intent === 'subscription') {
-            // Map transaction plan/entitlement to valid user plan types (pro, free, basic, enterprise)
-            const transactionPlan = transaction.plan || (transaction.entitlement === 'pro' ? 'pro' : 'free')
-            const userPlan = transactionPlan === 'pro' ? 'pro' : 'free' // Map standard/none to free
-            
+            const qpPlan = typeof resolvedSearchParams.plan === 'string' ? resolvedSearchParams.plan : null
+            const qpEntitlement =
+              typeof resolvedSearchParams.entitlement === 'string' ? resolvedSearchParams.entitlement : null
+
+            const entitlement =
+              (typeof transaction.entitlement === 'string' ? transaction.entitlement : null) ||
+              qpEntitlement ||
+              null
+            const transactionPlan =
+              (typeof transaction.plan === 'string' ? transaction.plan : null) || qpPlan || null
+
+            const userPlan: 'free' | 'basic' | 'pro' | 'enterprise' =
+              transactionPlan === 'pro' || entitlement === 'pro'
+                ? 'pro'
+                : transactionPlan === 'standard' || entitlement === 'standard'
+                  ? 'basic'
+                  : 'free'
+
+            const dbUser = await payload.findByID({
+              collection: 'users',
+              id: transactionUserId,
+              depth: 0,
+            })
+            const roles = toRoleArray((dbUser as { role?: unknown }).role)
+            const shouldGrantHost = userPlan === 'pro' && !roles.includes('admin') && !roles.includes('host')
+
             await payload.update({
               collection: 'users',
               id: transactionUserId,
@@ -140,6 +176,7 @@ export default async function BookingConfirmationPage({
                   plan: userPlan,
                   expiresAt: expiresAtDate ? expiresAtDate.toISOString() : undefined,
                 },
+                ...(shouldGrantHost ? { role: 'host' } : {}),
               },
             })
 
@@ -148,18 +185,18 @@ export default async function BookingConfirmationPage({
                 task: 'handleSubscriptionEvent',
                 queue: 'subscription-events',
                 input: {
-                  event: 'RENEWED',
+                  event: wasCompleted ? 'RENEWED' : 'INITIAL_PURCHASE',
                   userId: transactionUserId,
-                  subscriptionId: transactionId,
+                  transactionId,
                   plan: userPlan,
-                  entitlement: transaction.entitlement || 'standard',
+                  entitlement: entitlement || (userPlan === 'pro' ? 'pro' : 'standard'),
                   expiresAt: expiresAtDate ? expiresAtDate.toISOString() : undefined,
                 },
               })
             }
 
             activatedSubscription = {
-              packageName: transaction.packageName || 'Member Subscription',
+              membershipLabel: subscriptionMembershipLabel(userPlan, entitlement),
               amount: typeof transaction.amount === 'number' ? transaction.amount : null,
               currency: transaction.currency || 'ZAR',
               plan: userPlan,
@@ -807,7 +844,7 @@ export default async function BookingConfirmationPage({
               <div className="space-y-4 text-left">
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Membership</span>
-                  <span className="font-semibold">{activatedSubscription.packageName}</span>
+                  <span className="font-semibold">{activatedSubscription.membershipLabel}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Plan</span>
@@ -834,6 +871,11 @@ export default async function BookingConfirmationPage({
                 Explore Calendar
               </Button>
             </Link>
+            {activatedSubscription.plan === 'pro' && (
+              <Link href="/manage" passHref>
+                <Button variant="outline">Manage listings</Button>
+              </Link>
+            )}
             <Link href="/account" passHref>
               <Button variant="outline">Manage Membership</Button>
             </Link>

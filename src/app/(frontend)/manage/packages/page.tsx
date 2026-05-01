@@ -9,7 +9,9 @@ export default async function PackageManagePage() {
   if (!meUser?.user) {
     redirect('/login')
   }
-  if (!meUser.user.role?.includes('admin') && !meUser.user.role?.includes('host')) {
+  const role = meUser.user.role as string | string[] | undefined
+  const roleArray = Array.isArray(role) ? role : role ? [role] : []
+  if (!roleArray.includes('admin') && !roleArray.includes('host')) {
     redirect('/')
   }
 

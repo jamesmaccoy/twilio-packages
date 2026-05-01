@@ -18,7 +18,10 @@ export default async function ManagePackagesForPostPage({ params }: Props) {
     redirect('/login?redirect=/manage/packages')
   }
 
-  if (!(meUser.user as any).role?.includes('host') && !(meUser.user as any).role?.includes('admin')) {
+  const role = (meUser.user as any).role
+  const roleArray = Array.isArray(role) ? role : role ? [role] : []
+  const isAdminOrHost = roleArray.includes('admin') || roleArray.includes('host')
+  if (!isAdminOrHost) {
     redirect('/')
   }
 

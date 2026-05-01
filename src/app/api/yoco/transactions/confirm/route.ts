@@ -30,7 +30,9 @@ export async function POST(request: NextRequest) {
     }
 
     const isOwner = typeof transaction.user === 'string' ? transaction.user === user.id : transaction.user?.id === user.id
-    const isAdmin = Array.isArray(user.role) ? user.role.includes('admin') : user.role === 'admin'
+    const role = (user as { role?: unknown }).role
+    const roleArray = Array.isArray(role) ? role : role ? [role] : []
+    const isAdmin = roleArray.includes('admin')
 
     if (!isOwner && !isAdmin) {
       return NextResponse.json({ error: 'Not authorized to update this transaction' }, { status: 403 })
@@ -56,8 +58,9 @@ export async function POST(request: NextRequest) {
     })
 
     if (transaction.intent === 'subscription') {
-      const plan =
-        transaction.plan || (transaction.entitlement === 'pro' ? 'pro' : 'standard')
+      const rawPlan = transaction.plan || (transaction.entitlement === 'pro' ? 'pro' : 'standard')
+      const plan: 'free' | 'basic' | 'pro' | 'enterprise' =
+        rawPlan === 'pro' ? 'pro' : rawPlan === 'standard' ? 'basic' : 'free'
 
       if (status === 'completed') {
         await payload.jobs.queue({
@@ -66,7 +69,7 @@ export async function POST(request: NextRequest) {
           input: {
             event: 'RENEWED',
             userId: typeof transaction.user === 'string' ? transaction.user : transaction.user?.id,
-            subscriptionId: transactionId,
+            transactionId,
             plan,
             entitlement: transaction.entitlement || (plan === 'pro' ? 'pro' : 'standard'),
             expiresAt: expiresAt?.toISOString(),
@@ -79,7 +82,7 @@ export async function POST(request: NextRequest) {
           input: {
             event: status === 'failed' ? 'TRIAL_ENDED' : 'CANCELED',
             userId: typeof transaction.user === 'string' ? transaction.user : transaction.user?.id,
-            subscriptionId: transactionId,
+            transactionId,
             plan,
             entitlement: transaction.entitlement || (plan === 'pro' ? 'pro' : 'standard'),
           },

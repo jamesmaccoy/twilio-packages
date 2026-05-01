@@ -26,8 +26,11 @@ export default async function ManagePage() {
   if (!meUser?.user) {
     redirect('/login?redirect=/manage')
   }
-  
-  if (!(meUser.user as any).role?.includes('host') && !(meUser.user as any).role?.includes('admin')) {
+
+  const role = (meUser.user as any).role
+  const roleArray = Array.isArray(role) ? role : role ? [role] : []
+  const isAdminOrHost = roleArray.includes('admin') || roleArray.includes('host')
+  if (!isAdminOrHost) {
     redirect('/')
   }
 

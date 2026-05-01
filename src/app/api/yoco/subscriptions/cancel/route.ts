@@ -30,8 +30,9 @@ export async function POST(request: NextRequest) {
     const transactionUserId =
       typeof transaction.user === 'string' ? transaction.user : transaction.user?.id
 
-    const role = user.role
-    const isAdmin = Array.isArray(role) ? role.includes('admin') : role === 'admin'
+    const role = (user as { role?: unknown }).role
+    const roleArray = Array.isArray(role) ? role : role ? [role] : []
+    const isAdmin = roleArray.includes('admin')
 
     if (!isAdmin && transactionUserId !== user.id) {
       return NextResponse.json({ error: 'Not authorized to cancel this subscription' }, { status: 403 })
@@ -67,15 +68,18 @@ export async function POST(request: NextRequest) {
     })
 
     if (payload.jobs && typeof (payload.jobs as any).queue === 'function') {
+      const rawPlan = transaction.plan || (transaction.entitlement === 'pro' ? 'pro' : 'standard')
+      const plan: 'free' | 'basic' | 'pro' | 'enterprise' =
+        rawPlan === 'pro' ? 'pro' : rawPlan === 'standard' ? 'basic' : 'free'
       await (payload.jobs as any).queue({
         task: 'handleSubscriptionEvent',
         queue: 'subscription-events',
         input: {
           event: 'CANCELED',
           userId,
-          subscriptionId: transactionId,
-          plan: transaction.plan || 'standard',
-          entitlement: transaction.entitlement || 'standard',
+          transactionId,
+          plan,
+          entitlement: transaction.entitlement || (plan === 'pro' ? 'pro' : 'standard'),
           expiresAt: now.toISOString(),
         },
       })

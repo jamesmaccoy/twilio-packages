@@ -11,7 +11,7 @@ export type SubscriptionJobInput = {
   event: SubscriptionEvent
   userId: string
   transactionId?: string
-  plan?: 'standard' | 'pro'
+  plan?: 'free' | 'basic' | 'pro' | 'enterprise'
   entitlement?: 'none' | 'standard' | 'pro'
   expiresAt?: string
 }
@@ -25,6 +25,23 @@ const calculateNewExpiry = (input: SubscriptionJobInput) => {
 
   const now = new Date()
   return new Date(now.getTime() + THIRTY_DAYS)
+}
+
+function toRoleArray(role: unknown): string[] {
+  if (Array.isArray(role)) return role.filter((r): r is string => typeof r === 'string')
+  if (typeof role === 'string' && role.trim()) return [role.trim()]
+  return []
+}
+
+function normalizeUserPlan(
+  plan?: SubscriptionJobInput['plan'],
+  entitlement?: SubscriptionJobInput['entitlement'],
+): 'free' | 'basic' | 'pro' | 'enterprise' {
+  if (plan === 'pro' || entitlement === 'pro') return 'pro'
+  if (plan === 'basic' || entitlement === 'standard') return 'basic'
+  if (plan === 'enterprise') return 'enterprise'
+  if (plan === 'free') return 'free'
+  return 'free'
 }
 
 export const handleSubscriptionEvent: TaskHandler<SubscriptionJobInput> = async ({
@@ -45,6 +62,23 @@ export const handleSubscriptionEvent: TaskHandler<SubscriptionJobInput> = async 
     switch (event) {
       case 'RENEWED':
       case 'INITIAL_PURCHASE': {
+        const resolvedPlan = normalizeUserPlan(plan, entitlement)
+        const isPro = resolvedPlan === 'pro' || entitlement === 'pro'
+
+        let nextRole: string | undefined
+        if (isPro) {
+          const existing = await payload.findByID({
+            collection: 'users',
+            id: userId,
+            depth: 0,
+            req,
+          })
+          const roles = toRoleArray((existing as { role?: unknown }).role)
+          if (!roles.includes('admin') && !roles.includes('host')) {
+            nextRole = 'host'
+          }
+        }
+
         await payload.update({
           collection: 'users',
           id: userId,
@@ -52,7 +86,7 @@ export const handleSubscriptionEvent: TaskHandler<SubscriptionJobInput> = async 
           data: {
             subscriptionStatus: {
               status: 'active',
-              plan: plan || (entitlement === 'pro' ? 'pro' : 'standard'),
+              plan: resolvedPlan,
               expiresAt: expiresAtDate.toISOString(),
             },
             paymentValidation: {
@@ -60,6 +94,7 @@ export const handleSubscriptionEvent: TaskHandler<SubscriptionJobInput> = async 
               paymentStatus: 'completed',
               paymentMethod: 'credit_card',
             },
+            ...(nextRole ? { role: nextRole } : {}),
           },
         })
 
@@ -72,8 +107,13 @@ export const handleSubscriptionEvent: TaskHandler<SubscriptionJobInput> = async 
               status: 'completed',
               completedAt: now.toISOString(),
               expiresAt: expiresAtDate.toISOString(),
-              entitlement: entitlement || (plan === 'pro' ? 'pro' : 'standard'),
-              plan: plan || (entitlement === 'pro' ? 'pro' : 'standard'),
+              entitlement: entitlement || (resolvedPlan === 'pro' || resolvedPlan === 'enterprise' ? 'pro' : 'standard'),
+              plan:
+                resolvedPlan === 'pro' || resolvedPlan === 'enterprise'
+                  ? 'pro'
+                  : resolvedPlan === 'basic'
+                    ? 'standard'
+                    : 'free',
             },
           })
         }
@@ -82,6 +122,7 @@ export const handleSubscriptionEvent: TaskHandler<SubscriptionJobInput> = async 
 
       case 'CANCELED':
       case 'EXPIRED': {
+        const resolvedPlan = normalizeUserPlan(plan, entitlement)
         await payload.update({
           collection: 'users',
           id: userId,
@@ -89,7 +130,7 @@ export const handleSubscriptionEvent: TaskHandler<SubscriptionJobInput> = async 
           data: {
             subscriptionStatus: {
               status: event === 'EXPIRED' ? 'canceled' : 'past_due',
-              plan: plan || 'free',
+              plan: resolvedPlan,
               expiresAt: expiresAtDate.toISOString(),
             },
             paymentValidation: {
@@ -114,6 +155,7 @@ export const handleSubscriptionEvent: TaskHandler<SubscriptionJobInput> = async 
         req.payload.logger.warn(
           `[jobs:handleSubscriptionEvent] Trial ended for user ${userId}. Marking subscriptionStatus to trial-ended.`,
         )
+        const resolvedPlan = normalizeUserPlan(plan, entitlement)
         await payload.update({
           collection: 'users',
           id: userId,
@@ -121,7 +163,7 @@ export const handleSubscriptionEvent: TaskHandler<SubscriptionJobInput> = async 
           data: {
             subscriptionStatus: {
               status: 'past_due',
-              plan: plan || 'free',
+              plan: resolvedPlan,
               expiresAt: expiresAtDate.toISOString(),
             },
           },
