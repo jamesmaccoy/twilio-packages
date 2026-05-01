@@ -2,6 +2,57 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import configPromise from '@/payload.config'
 import { sendPackageActivityNotification } from '@/lib/emailNotifications'
+import jwt from 'jsonwebtoken'
+
+async function getAuthedUser(payload: any, request: NextRequest): Promise<any | null> {
+  let user: any = null
+  try {
+    const authResult = await payload.auth({ headers: request.headers })
+    user = authResult.user
+  } catch {
+    user = null
+  }
+
+  const prefixToken = request.cookies.get(`${payload.config.cookiePrefix}-token`)?.value
+  const legacyToken = request.cookies.get('payload-token')?.value
+  const authTokens = [prefixToken, legacyToken].filter(
+    (token, index, self): token is string => Boolean(token) && self.indexOf(token) === index,
+  )
+
+  if (!user && authTokens.length > 0) {
+    for (const token of authTokens) {
+      try {
+        const headersWithToken = new Headers(request.headers)
+        headersWithToken.set('authorization', `JWT ${token}`)
+        const tokenAuthResult = await payload.auth({ headers: headersWithToken })
+        if (tokenAuthResult.user) {
+          user = tokenAuthResult.user
+          break
+        }
+      } catch {
+        continue
+      }
+    }
+  }
+
+  if (!user && authTokens.length > 0) {
+    for (const token of authTokens) {
+      try {
+        const decoded = jwt.verify(token, payload.secret) as unknown
+        const id =
+          typeof decoded === 'object' && decoded !== null && 'id' in decoded ? (decoded as any).id : null
+        if (typeof id === 'string' && id.length > 0) {
+          user = await payload.findByID({ collection: 'users', id, overrideAccess: true, depth: 0 })
+          break
+        }
+      } catch {
+        continue
+      }
+    }
+  }
+
+  return user || null
+}
 
 export async function GET(
   request: NextRequest,
@@ -17,17 +68,7 @@ export async function GET(
     const depth = parseInt(searchParams.get('depth') || '2', 10)
     
     // Check authentication
-    let user = null
-    try {
-      const authResult = await payload.auth({ headers: request.headers })
-      user = authResult.user
-    } catch (authError) {
-      // User not authenticated
-      return NextResponse.json(
-        { error: 'Unauthorized. Please log in to access packages.' },
-        { status: 401 }
-      )
-    }
+    const user = await getAuthedUser(payload, request)
     
     if (!user) {
       return NextResponse.json(
@@ -65,13 +106,7 @@ export async function PATCH(
   try {
     const { id } = await params
     const payload = await getPayload({ config: configPromise })
-    let user: any = null
-    try {
-      const authResult = await payload.auth({ headers: request.headers })
-      user = authResult.user
-    } catch {
-      user = null
-    }
+    const user = await getAuthedUser(payload, request)
     
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -337,7 +372,7 @@ export async function DELETE(
   try {
     const { id } = await params
     const payload = await getPayload({ config: configPromise })
-    const { user } = await payload.auth({ headers: request.headers })
+    const user = await getAuthedUser(payload, request)
     
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
