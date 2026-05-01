@@ -9,9 +9,9 @@ import {
   lexicalEditor,
 } from '@payloadcms/richtext-lexical'
 
-import { authenticated } from '../../access/authenticated'
-import { authenticatedOrPublished } from '../../access/authenticatedOrPublished'
+import { hostOwnsPost } from '../../access/hostOwnsPost'
 import { adminOrHost } from '../../access/adminOrHost'
+import { adminOrHostOwnPost } from '../../access/adminOrHostOwnPost'
 import { Banner } from '../../blocks/Banner/config'
 import { Code } from '../../blocks/Code/config'
 import { MediaBlock } from '../../blocks/MediaBlock/config'
@@ -32,9 +32,9 @@ export const Posts: CollectionConfig<'posts'> = {
   slug: 'posts',
   access: {
     create: adminOrHost,
-    delete: adminOrHost,
-    read: authenticatedOrPublished,
-    update: adminOrHost,
+    delete: adminOrHostOwnPost,
+    read: hostOwnsPost,
+    update: adminOrHostOwnPost,
   },
   // This config controls what's populated by default when a post is referenced
   // https://payloadcms.com/docs/queries/select#defaultpopulate-collection-config-property
@@ -70,6 +70,16 @@ export const Posts: CollectionConfig<'posts'> = {
     useAsTitle: 'title',
   },
   fields: [
+    {
+      name: 'host',
+      type: 'relationship',
+      relationTo: 'users',
+      admin: { position: 'sidebar', readOnly: true },
+      access: {
+        create: () => false,
+        update: () => false,
+      },
+    },
     {
       name: 'title',
       type: 'text',
@@ -290,6 +300,41 @@ export const Posts: CollectionConfig<'posts'> = {
     ...slugField(),
   ],
   hooks: {
+    beforeChange: [
+      async ({ data, req, operation }) => {
+        const user = (req as any)?.user
+        const role = (user as any)?.role
+        const roleArray = Array.isArray(role) ? role : role ? [role] : []
+        const isHost = roleArray.includes('host')
+        const isAdmin = roleArray.includes('admin')
+
+        if (!user || !isHost) return data
+
+        // On create, or if host field missing, pin host ownership to the acting host.
+        if (operation === 'create' || !(data as any)?.host) {
+          ;(data as any).host = user.id
+        }
+
+        // Ensure the acting host is always included in authors for backwards-compat ownership checks.
+        const authorsValue = (data as any)?.authors
+        const authors: string[] = Array.isArray(authorsValue)
+          ? authorsValue.map((a: any) => (typeof a === 'string' ? a : a?.id)).filter(Boolean)
+          : authorsValue
+            ? [typeof authorsValue === 'string' ? authorsValue : authorsValue?.id].filter(Boolean)
+            : []
+
+        if (!authors.includes(String(user.id))) {
+          ;(data as any).authors = [...authors, String(user.id)]
+        }
+
+        // Hosts can't remove/alter host ownership via payload admin shapes.
+        if (!isAdmin) {
+          ;(data as any).host = user.id
+        }
+
+        return data
+      },
+    ],
     afterChange: [revalidatePost],
     afterRead: [populateAuthors],
     afterDelete: [revalidateDelete],

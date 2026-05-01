@@ -65,6 +65,8 @@ export async function GET(
         collection: 'posts',
         id: postId,
         depth: 1,
+        user: user || undefined,
+        overrideAccess: false,
       })
     } catch (error) {
       // Don't log the full error to reduce noise, just continue without custom names
@@ -80,6 +82,8 @@ export async function GET(
       },
       depth: 2,
       limit: 100, // Increase limit to ensure we get all packages
+      user: user || undefined,
+      overrideAccess: false,
     })
     
     console.log('🔍 All packages for post (before isEnabled filter):', {
@@ -103,6 +107,8 @@ export async function GET(
       },
       depth: 2, // Increased depth to include related page data
       limit: 100, // Increase limit to ensure we get all packages
+      user: user || undefined,
+      overrideAccess: false,
     })
     
     // Debug: Check if specific package is in database results
@@ -127,6 +133,8 @@ export async function GET(
           collection: 'packages',
           id: '68a587e7420e4517de8d2b2d',
           depth: 1,
+          user: user || undefined,
+          overrideAccess: false,
         })
         console.log('🔍 Direct package lookup:', {
           id: directPackage.id,

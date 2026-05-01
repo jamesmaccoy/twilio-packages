@@ -310,6 +310,7 @@ export interface User {
  */
 export interface Package {
   id: string;
+  host?: (string | null) | User;
   post: string | Post;
   name: string;
   description?: string | null;
@@ -354,6 +355,7 @@ export interface Package {
  */
 export interface Post {
   id: string;
+  host?: (string | null) | User;
   title: string;
   heroImage?: (string | null) | Media;
   content: {
@@ -1698,6 +1700,7 @@ export interface FormBlockSelect<T extends boolean = true> {
  * via the `definition` "posts_select".
  */
 export interface PostsSelect<T extends boolean = true> {
+  host?: T;
   title?: T;
   heroImage?: T;
   content?: T;
@@ -1909,6 +1912,7 @@ export interface UsersSelect<T extends boolean = true> {
  * via the `definition` "packages_select".
  */
 export interface PackagesSelect<T extends boolean = true> {
+  host?: T;
   post?: T;
   name?: T;
   description?: T;

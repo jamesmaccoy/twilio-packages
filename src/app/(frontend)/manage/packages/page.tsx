@@ -23,7 +23,8 @@ export default async function PackageManagePage() {
       collection: 'posts',
       limit: 100,
       depth: 1,
-      user: meUser.user
+      user: meUser.user,
+      overrideAccess: false,
     })
     posts = result.docs || []
   } catch (err) {

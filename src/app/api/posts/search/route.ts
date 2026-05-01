@@ -13,6 +13,15 @@ export async function GET(request: NextRequest) {
     }
 
     const payload = await getPayload({ config: configPromise })
+
+    // If the caller is authenticated, apply access control for host-owned posts as well.
+    let user: any = null
+    try {
+      const authResult = await payload.auth({ headers: request.headers })
+      user = authResult.user
+    } catch {
+      user = null
+    }
     
     const where: any = {}
     
@@ -33,6 +42,8 @@ export async function GET(request: NextRequest) {
         title: true,
         slug: true,
       },
+      user: user || undefined,
+      overrideAccess: false,
     })
     
     return NextResponse.json({ docs: posts.docs })

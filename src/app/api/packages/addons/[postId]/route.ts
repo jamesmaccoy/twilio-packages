@@ -11,6 +11,15 @@ export async function GET(
     const payload = await getPayload({ config: configPromise })
     const { postId } = await params
     
+    // If authenticated, apply host ownership checks for draft/unpublished posts too.
+    let user: any = null
+    try {
+      const authResult = await payload.auth({ headers: request.headers })
+      user = authResult.user
+    } catch {
+      user = null
+    }
+    
     // Get the post data to access packageSettings for custom names
     let postData = null
     try {
@@ -18,6 +27,8 @@ export async function GET(
         collection: 'posts',
         id: postId,
         depth: 1,
+        user: user || undefined,
+        overrideAccess: false,
       })
     } catch (error) {
       console.log('Failed to fetch post data for custom names, continuing without custom names')
@@ -32,6 +43,8 @@ export async function GET(
         category: { equals: 'addon' }
       },
       depth: 2, // Increased depth to include related page data
+      user: user || undefined,
+      overrideAccess: false,
     })
     const yocoProducts = await yocoService.getProducts()
     

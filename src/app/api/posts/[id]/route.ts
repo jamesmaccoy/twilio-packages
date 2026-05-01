@@ -521,11 +521,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   try {
     const { id } = await params
     const payload = await getPayload({ config: configPromise })
-    
+
+    // Apply access control: unauthenticated can only read published posts;
+    // hosts can only read their own posts; admins can read all.
+    const user = await getAuthedUser(payload, req)
     const post = await payload.findByID({
       collection: 'posts',
       id,
       depth: 2, // Include related data
+      user: user || undefined,
+      overrideAccess: false,
     })
 
     if (!post) {

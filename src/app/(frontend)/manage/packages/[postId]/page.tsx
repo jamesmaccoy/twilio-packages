@@ -35,6 +35,7 @@ export default async function ManagePackagesForPostPage({ params }: Props) {
       limit: 100,
       depth: 1,
       user: meUser.user,
+      overrideAccess: false,
     })
     posts = result.docs || []
   } catch {

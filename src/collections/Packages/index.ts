@@ -1,15 +1,15 @@
 import type { CollectionConfig } from 'payload'
-import { authenticated } from '../../access/authenticated'
-import { adminOrSelf } from '../../access/adminOrSelf'
-import { adminOrHost } from '../../access/adminOrHost'
+import { hostOwnsPackage } from '../../access/hostOwnsPackage'
+import { adminOrHostOwnPackage } from '../../access/adminOrHostOwnPackage'
+import { adminOrHostCreatePackage } from '../../access/adminOrHostCreatePackage'
 
 const Packages: CollectionConfig = {
   slug: 'packages',
   access: {
-    create: adminOrHost,
-    read: authenticated,
-    update: adminOrHost,
-    delete: adminOrHost,
+    create: adminOrHostCreatePackage,
+    read: hostOwnsPackage,
+    update: adminOrHostOwnPackage,
+    delete: adminOrHostOwnPackage,
   },
   admin: {
     useAsTitle: 'name',
@@ -17,14 +17,73 @@ const Packages: CollectionConfig = {
   },
   hooks: {
     beforeChange: [
-      ({ data }) => {
+      async ({ data, req }) => {
         // Prevent unwanted default value overrides during updates
         // Only apply defaults for new documents (no id) and when values are actually undefined
+        // Also pin host ownership based on the related post (or current host).
+        try {
+          const user = (req as any)?.user
+          const role = (user as any)?.role
+          const roleArray = Array.isArray(role) ? role : role ? [role] : []
+          const isAdmin = roleArray.includes('admin')
+          const isHost = roleArray.includes('host')
+
+          if (user && (isAdmin || isHost)) {
+            const postValue = (data as any)?.post
+            const postId =
+              typeof postValue === 'string'
+                ? postValue
+                : typeof postValue === 'object' && postValue
+                  ? postValue?.id
+                  : null
+
+            const payload = (req as any)?.payload
+            if (postId && payload && typeof payload.findByID === 'function') {
+              const post = await payload.findByID({
+                collection: 'posts',
+                id: String(postId),
+                depth: 0,
+                overrideAccess: false,
+                user,
+              })
+
+              const hostId =
+                typeof (post as any)?.host === 'string' ? (post as any).host : (post as any)?.host?.id
+              if (isHost && !isAdmin && hostId && String(hostId) !== String(user.id)) {
+                throw new Error('You cannot attach a package to another host’s property.')
+              }
+              if (hostId) {
+                ;(data as any).host = String(hostId)
+              } else if (isHost && user?.id) {
+                ;(data as any).host = String(user.id)
+              }
+            } else if (isHost && user?.id) {
+              ;(data as any).host = String(user.id)
+            }
+
+            // Hosts cannot change package host ownership away from themselves.
+            if (isHost && !isAdmin && user?.id) {
+              ;(data as any).host = String(user.id)
+            }
+          }
+        } catch {
+          // ignore
+        }
         return data
       }
     ]
   },
   fields: [
+    {
+      name: 'host',
+      type: 'relationship',
+      relationTo: 'users',
+      admin: { position: 'sidebar', readOnly: true },
+      access: {
+        create: () => false,
+        update: () => false,
+      },
+    },
     {
       name: 'post',
       type: 'relationship',
