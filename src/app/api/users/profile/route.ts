@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import configPromise from '@/payload.config'
+import { resolvePayloadUserFromRequest } from '@/utilities/resolvePayloadUserFromRequest'
 
 function isPlaceholderMobileEmail(email: string): boolean {
   return email.endsWith('@phone.simpleplek.invalid')
@@ -10,7 +11,7 @@ export async function PATCH(request: NextRequest) {
   try {
     const payload = await getPayload({ config: configPromise })
 
-    const { user } = await payload.auth({ headers: request.headers })
+    const user = await resolvePayloadUserFromRequest(request, payload)
     if (!user?.id) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
