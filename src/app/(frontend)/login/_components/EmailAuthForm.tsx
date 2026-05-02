@@ -10,6 +10,8 @@ import { useUserContext } from '@/context/UserContext'
 import { validateRedirect } from '@/utils/validateRedirect'
 import { useSubscription } from '@/hooks/useSubscription'
 import Link from 'next/link'
+import { DIAL_COUNTRY_OPTIONS, dialCountrySelectClassName, phoneNumberFieldGrowClassName } from '@/lib/dialCountries'
+import { cn } from '@/utilities/ui'
 
 type IdentifierFormValues = {
   identifier: string
@@ -269,23 +271,18 @@ export default function EmailAuthForm() {
 
           <div className="grid gap-2">
            
-           <div className="flex gap-2">
+           <div className="flex min-w-0 gap-2">
              {showCountryCode && (
                <select
                  aria-label="Country code"
                  {...form.register('countryCode', { required: true })}
-                 className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2"
+                 className={dialCountrySelectClassName}
                >
-                 <option value="+27">South Africa (+27)</option>
-                 <option value="+1">United States / Canada (+1)</option>
-                 <option value="+44">United Kingdom (+44)</option>
-                 <option value="+49">Germany (+49)</option>
-                 <option value="+33">France (+33)</option>
-                 <option value="+34">Spain (+34)</option>
-                 <option value="+39">Italy (+39)</option>
-                 <option value="+31">Netherlands (+31)</option>
-                 <option value="+61">Australia (+61)</option>
-                 <option value="+353">Ireland (+353)</option>
+                 {DIAL_COUNTRY_OPTIONS.map((c) => (
+                   <option key={c.dial} value={c.dial} title={c.label}>
+                     {c.flag} {c.dial}
+                   </option>
+                 ))}
                </select>
              )}
              <Input
@@ -296,7 +293,10 @@ export default function EmailAuthForm() {
                autoCapitalize="none"
                autoCorrect="off"
                {...form.register('identifier', { required: true })}
-               className="flex h-10 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+               className={cn(
+                 'flex h-10 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+                 showCountryCode ? phoneNumberFieldGrowClassName : 'w-full',
+               )}
              />
            </div>
          </div>

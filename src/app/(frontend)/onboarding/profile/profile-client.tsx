@@ -68,12 +68,7 @@ export default function ProfileOnboardingClient() {
   const missingName = name.trim().length === 0
   const missingEmail = email.trim().length === 0 || isPlaceholderMobileEmail(email)
   const missingMobile = mobile.trim().length === 0 || !mobileVerified
-
-  React.useEffect(() => {
-    if (!loading && !error && !missingName && !missingEmail && !missingMobile) {
-      router.replace(next)
-    }
-  }, [loading, error, missingName, missingEmail, missingMobile, next, router])
+  const canSubmitProfile = !missingName && !missingEmail
 
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -94,6 +89,11 @@ export default function ProfileOnboardingClient() {
       const data = await res.json().catch(() => null)
       if (!res.ok) {
         throw new Error(data?.error || data?.message || 'Failed to save profile')
+      }
+
+      if (mobile.trim().length === 0 || !mobileVerified) {
+        router.replace(`/onboarding/mobile?next=${encodeURIComponent(next)}&skipProfileWrap=1`)
+        return
       }
 
       router.replace(next)
@@ -120,13 +120,14 @@ export default function ProfileOnboardingClient() {
 
         {missingMobile && (
           <div className="bg-amber-50 text-amber-900 border border-amber-200 p-3 rounded-md text-sm">
-            Your mobile number must be verified before you can continue.{' '}
+            Save your name and email below first. If your number is not verified yet, we will take you to verify it
+            before returning to your account.{' '}
             <button
               type="button"
               className="underline underline-offset-2 font-medium"
-              onClick={() => router.push(`/onboarding/mobile?next=${encodeURIComponent(next)}`)}
+              onClick={() => router.push(`/onboarding/mobile?next=${encodeURIComponent(next)}&skipProfileWrap=1`)}
             >
-              Verify mobile
+              Verify mobile now
             </button>
           </div>
         )}
@@ -180,7 +181,7 @@ export default function ProfileOnboardingClient() {
             </div>
           </div>
 
-          <Button type="submit" disabled={saving || missingMobile || name.trim().length === 0 || email.trim().length === 0}>
+          <Button type="submit" disabled={saving || !canSubmitProfile}>
             {saving ? 'Saving...' : 'Save and continue'}
           </Button>
         </form>

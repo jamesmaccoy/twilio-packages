@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input'
 import { InputOTP, InputOTPGroup, InputOTPSeparator, InputOTPSlot } from '@/components/ui/input-otp'
 import { validateRedirect } from '@/utils/validateRedirect'
 import { useUserContext } from '@/context/UserContext'
+import { DIAL_COUNTRY_OPTIONS, dialCountrySelectClassName, phoneNumberFieldGrowClassName } from '@/lib/dialCountries'
+import { cn } from '@/utilities/ui'
 
 export default function MobileOnboardingClient() {
   const [mobileInput, setMobileInput] = React.useState('')
@@ -22,6 +24,8 @@ export default function MobileOnboardingClient() {
   const { handleAuthChange } = useUserContext()
 
   const next = validateRedirect(searchParams.get('next')) || '/bookings'
+  /** When set (e.g. after saving name/email on profile), return straight to `next` instead of forcing profile again. */
+  const skipProfileWrap = searchParams.get('skipProfileWrap') === '1'
   const normalizedMobile = `${countryCode}${mobileInput.replace(/\D/g, '').replace(/^0+/, '')}`
 
   const handleSendCode = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -76,7 +80,16 @@ export default function MobileOnboardingClient() {
       }
 
       handleAuthChange()
-      router.push(`/onboarding/profile?next=${encodeURIComponent(next)}`)
+      if (skipProfileWrap) {
+        try {
+          const url = new URL(next, typeof window !== 'undefined' ? window.location.origin : 'http://localhost')
+          router.replace(`${url.pathname}${url.search}`)
+        } catch {
+          router.replace(next.startsWith('/') ? next : `/${next}`)
+        }
+        return
+      }
+      router.replace(`/onboarding/profile?next=${encodeURIComponent(next)}`)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to verify code')
     } finally {
@@ -106,23 +119,18 @@ export default function MobileOnboardingClient() {
               <label className="text-sm font-medium text-zinc-800 dark:text-foreground" htmlFor="mobile-number">
                 Mobile number
               </label>
-              <div className="flex gap-2">
+              <div className="flex min-w-0 gap-2">
                 <select
                   aria-label="Country code"
-                  className="h-10 rounded-md border border-zinc-200 dark:border-border bg-white dark:bg-card px-3 text-sm text-zinc-900 dark:text-foreground [color-scheme:light] dark:[color-scheme:dark]"
+                  className={dialCountrySelectClassName}
                   value={countryCode}
                   onChange={(event) => setCountryCode(event.target.value)}
                 >
-                  <option value="+27">South Africa (+27)</option>
-                  <option value="+1">United States / Canada (+1)</option>
-                  <option value="+44">United Kingdom (+44)</option>
-                  <option value="+49">Germany (+49)</option>
-                  <option value="+33">France (+33)</option>
-                  <option value="+34">Spain (+34)</option>
-                  <option value="+39">Italy (+39)</option>
-                  <option value="+31">Netherlands (+31)</option>
-                  <option value="+61">Australia (+61)</option>
-                  <option value="+353">Ireland (+353)</option>
+                  {DIAL_COUNTRY_OPTIONS.map((c) => (
+                    <option key={c.dial} value={c.dial} title={c.label}>
+                      {c.flag} {c.dial}
+                    </option>
+                  ))}
                 </select>
                 <Input
                   id="mobile-number"
@@ -131,6 +139,7 @@ export default function MobileOnboardingClient() {
                   value={mobileInput}
                   onChange={(event) => setMobileInput(event.target.value)}
                   autoComplete="tel"
+                  className={cn(phoneNumberFieldGrowClassName)}
                 />
               </div>
             </div>
