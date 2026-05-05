@@ -181,8 +181,8 @@ class YocoService {
       },
       {
         id: 'per_hour_luxury',
-        title: '✨ Luxury Hours',
-        description: 'Premium hourly service with VIP treatment',
+        title: '✨ Pro Host',
+        description: 'Host your own plek with your own addons',
         price: 50.00,
         currency: 'ZAR',
         period: 'hour' as const,

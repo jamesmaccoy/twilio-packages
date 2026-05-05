@@ -335,6 +335,101 @@ Always express prices in South African Rand (R), not cents.`
     // Fetch user's bookings, estimates, and available packages
     const payload = await getPayload({ config: configPromise })
 
+    // Account page assistant (tenant stance + purchased packages only)
+    if (context === 'account') {
+      const accountTransactions = Array.isArray(pageData?.transactions) ? pageData.transactions : []
+      const purchasedProducts = Array.isArray(pageData?.products) ? pageData.products : []
+
+      const transactionSummary = accountTransactions
+        .slice(0, 30)
+        .map((t: any) => ({
+          id: t?.id,
+          packageName: t?.packageName || '',
+          status: t?.status || '',
+          amount: typeof t?.amount === 'number' ? t.amount : null,
+          currency: t?.currency || 'ZAR',
+          createdAt: t?.createdAt || null,
+          expiresAt: t?.expiresAt || null,
+          category: t?.category || '',
+        }))
+
+      const purchasedSummary = purchasedProducts
+        .slice(0, 30)
+        .map((p: any) => ({
+          id: p?.id,
+          title: p?.title,
+          description: p?.description,
+          price: p?.price,
+          currency: p?.currency,
+          period: p?.period,
+          periodCount: p?.periodCount,
+          category: p?.category,
+          features: Array.isArray(p?.features) ? p.features : [],
+          entitlement: p?.entitlement,
+        }))
+
+      const leaseTemplateExcerpt = `LEASE AGREEMENT (template excerpt used in SimplePlek statements)
+
+Parties:
+- Landlord / Host: provides the premises; sets rental terms; receives rent; arranges maintenance when notified.
+- Tenant / Occupier: pays rent on time; takes reasonable care; returns keys; is liable for negligence/damage; gives notice.
+
+Common clauses in the template:
+- RENT: payable in advance on the 1st of each month (debit order or transfer).
+- KEYS: provided after first payment; must be returned at end; replacements at tenant expense.
+- LIABILITY: tenant liable for damage due to negligence; occupancy limits may apply.
+- NOTICE: two months notice required on both sides after initial term.
+- REPAIRS / MAINTENANCE: report defects promptly; consult owners prior to changes; wear & tear vs damage.
+- NO SMOKING / FIRE RISK: restrictions apply; tenant responsible for compliance.
+
+IMPORTANT: This is not legal advice; explain practical "where do I stand" implications.`
+
+      const systemPrompt = `You are the AI assistant for a South African property rental/booking platform.
+
+This is the ACCOUNT page. The user is acting as a TENANT (booking customer).
+
+Your job:
+1) Interpret the relationship between TENANT and LANDLORD/HOST and explain the stance of both parties in relation to the lease agreement template.
+2) Then explain what the HOST is providing based only on packages the tenant has ALREADY purchased.
+
+Hard rules:
+- If there are NO completed transactions, then the tenant has purchased NO packages. Do NOT show or invent any available packages.
+- Only reference packages included in Purchased Packages below. Do NOT mention other packages or upsells by name that are not in the list.
+- You may suggest the tenant "ask the host" for upgrades/add-ons, but do not describe or price unpurchased packages.
+- Be concise, practical, and avoid legal claims.
+
+Lease template context:
+${leaseTemplateExcerpt}
+
+Completed transactions (summary):
+${JSON.stringify(transactionSummary, null, 2)}
+
+Purchased packages (host-provided, already purchased):
+${JSON.stringify(purchasedSummary, null, 2)}
+
+Answer the user's question in 2 parts:
+- Part A: "Where do I stand?" (tenant vs landlord obligations and rights, in plain language).
+- Part B: "What you've purchased" (map purchased packages to what the host provides; clearly state what is NOT included when relevant).`
+
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+      const chat = model.startChat({
+        history: [
+          { role: 'user', parts: [{ text: systemPrompt }] },
+          { role: 'model', parts: [{ text: "Understood. I'll answer with tenant/landlord stance and then summarize only what you've already purchased." }] },
+        ],
+      })
+
+      const messageText = String(message || '').trim()
+      if (!messageText) {
+        return NextResponse.json({ error: 'Message is required' }, { status: 400 })
+      }
+      const result = await chat.sendMessage(messageText)
+      const response = await result.response
+      const text = response.text()
+      const usage = serializeUsageMetadata(response.usageMetadata)
+      return NextResponse.json({ message: text, response: text, usage })
+    }
+
     const [bookings, estimates, packages] = await Promise.all([
       payload.find({
         collection: 'bookings',

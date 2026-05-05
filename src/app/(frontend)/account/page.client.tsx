@@ -1,16 +1,13 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { User } from '@/payload-types'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Settings, User as UserIcon, Crown, Calendar, FileText, Edit3, Loader2, AlertCircle, CheckCircle2, ArrowUpDown, Filter, Eye, Download, MoreHorizontal, CreditCard, Activity, Sparkles } from 'lucide-react'
+import { Settings, Crown, Loader2, AlertCircle, CheckCircle2, ArrowUpDown, Filter, Eye, Download, MoreHorizontal, CreditCard, Activity, Sparkles } from 'lucide-react'
 import { PageAIAssistant } from '@/components/AIAssistant/PageAIAssistant'
 import { useSubscription } from '@/hooks/useSubscription'
-import { EditPostsLink } from '@/components/EditPostsLink'
 import { Switch } from '@/components/ui/switch'
 import Link from 'next/link'
-import { getGravatarUrl } from '@/utils/gravatar'
 import { Gravatar } from '@/components/Gravatar'
 
 function isPlaceholderMobileEmail(email?: string | null): boolean {
@@ -48,7 +45,7 @@ interface AccountClientProps {
 }
 
 export default function AccountClient({ user }: AccountClientProps) {
-  const { isSubscribed, isLoading } = useSubscription()
+  const { isSubscribed } = useSubscription()
   const [transactions, setTransactions] = useState<YocoTransaction[]>([])
   const [loadingTransactions, setLoadingTransactions] = useState(false)
   const [activeTransaction, setActiveTransaction] = useState<YocoTransaction | null>(null)
@@ -63,10 +60,10 @@ export default function AccountClient({ user }: AccountClientProps) {
   const [activeProducts, setActiveProducts] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState<'features' | 'transactions' | 'activity'>('features')
 
-  if (!user) return null
-  const missingName = !user.name || String(user.name).trim().length === 0
-  const missingEmail = !user.email || isPlaceholderMobileEmail(user.email)
-  const missingMobile = !(user as any).mobile || !(user as any).mobileVerified
+  const mobileInfo = (user ?? null) as unknown as { mobile?: string; mobileVerified?: boolean } | null
+  const missingName = !user?.name || String(user.name).trim().length === 0
+  const missingEmail = !user?.email || isPlaceholderMobileEmail(user.email)
+  const missingMobile = !user || !mobileInfo?.mobile || !mobileInfo?.mobileVerified
   const missingRequiredInfo = missingName || missingEmail || missingMobile
 
   useEffect(() => {
@@ -126,6 +123,34 @@ export default function AccountClient({ user }: AccountClientProps) {
     loadProducts()
   }, [user, isSubscribed])
 
+  const completedTransactions = useMemo(
+    () => transactions.filter((t) => t.status === 'completed'),
+    [transactions],
+  )
+
+  const purchasedProducts = useMemo(() => {
+    const norm = (value: unknown) =>
+      String(value ?? '')
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, ' ')
+        .replace(/[^a-z0-9 ]/g, '')
+
+    const purchasedKeys = new Set<string>()
+    for (const tx of completedTransactions) {
+      const key = norm(tx.packageName)
+      if (key) purchasedKeys.add(key)
+    }
+
+    if (purchasedKeys.size === 0) return []
+
+    return (availableProducts || []).filter((p) => {
+      const titleKey = norm(p.title)
+      const idKey = norm(p.id)
+      return (titleKey && purchasedKeys.has(titleKey)) || (idKey && purchasedKeys.has(idKey))
+    })
+  }, [availableProducts, completedTransactions])
+
   if (!user) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -138,9 +163,6 @@ export default function AccountClient({ user }: AccountClientProps) {
   }
 
   const userRoles = Array.isArray(user.role) ? (user.role as string[]) : user.role ? [user.role] : []
-  const isHost = userRoles.includes('host')
-  const isAdmin = userRoles.includes('admin')
-  const isCustomer = userRoles.includes('customer')
 
   // Infer subscription tier from transaction history
   const inferSubscriptionTier = (transactions: YocoTransaction[]): string => {
@@ -182,16 +204,6 @@ export default function AccountClient({ user }: AccountClientProps) {
     }
   }
 
-
-  const getStatusBadge = (status: string) => {
-    const styles: Record<string, string> = {
-      completed: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
-      pending: 'bg-amber-500/10 text-amber-700 border-amber-500/20',
-      failed: 'bg-red-500/10 text-red-700 border-red-500/20',
-      cancelled: 'bg-gray-500/10 text-gray-700 border-gray-500/20'
-    }
-    return styles[status] || styles.pending
-  }
 
   const getTierBadge = (tier: string) => {
     const styles: Record<string, string> = {
@@ -310,8 +322,8 @@ export default function AccountClient({ user }: AccountClientProps) {
             context={{
               type: 'account',
               data: {
-                transactions,
-                products: availableProducts,
+                transactions: completedTransactions,
+                products: purchasedProducts,
               },
             }}
           />
@@ -419,9 +431,9 @@ export default function AccountClient({ user }: AccountClientProps) {
                     <div className="font-medium text-foreground">{user.name || 'No name set'}</div>
                     <div className="text-sm text-muted-foreground">{user.email}</div>
                     <div className="mt-1 text-sm text-muted-foreground">
-                      {(user as any).mobile ? (user as any).mobile : 'No mobile set'}{' '}
+                      {mobileInfo?.mobile ? mobileInfo.mobile : 'No mobile set'}{' '}
                       <span className="text-xs">
-                        {(user as any).mobileVerified ? '(verified)' : '(not verified)'}
+                        {mobileInfo?.mobileVerified ? '(verified)' : '(not verified)'}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 mt-2">
@@ -488,16 +500,16 @@ export default function AccountClient({ user }: AccountClientProps) {
                 <h3 className="text-lg font-semibold text-foreground mb-4">
                   Available Packages
                 </h3>
-                {loadingProducts ? (
+                {loadingProducts || loadingTransactions ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="h-5 w-5 animate-spin text-primary" />
                     <span className="ml-2 text-sm text-muted-foreground">Loading packages...</span>
                   </div>
-                ) : availableProducts.length === 0 ? (
+                ) : purchasedProducts.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-8 text-center">No packages available.</p>
                 ) : (
                   <div className="space-y-3">
-                    {availableProducts.map((product) => {
+                    {purchasedProducts.map((product) => {
                       const isActive = activeProducts.has(product.id)
                       const canToggle = isSubscribed || product.entitlement === 'none'
 
@@ -805,16 +817,16 @@ export default function AccountClient({ user }: AccountClientProps) {
 
         {activeTab === 'activity' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {loadingProducts ? (
+            {loadingProducts || loadingTransactions ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-5 w-5 animate-spin text-primary" />
                 <span className="ml-2 text-sm text-muted-foreground">Loading packages...</span>
               </div>
-            ) : availableProducts.length === 0 ? (
+            ) : purchasedProducts.length === 0 ? (
               <p className="text-sm text-muted-foreground py-8 text-center">No packages available.</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {availableProducts
+                {purchasedProducts
                   .filter((product) => product.category !== 'addon')
                   .slice(0, 4)
                   .map((product) => {

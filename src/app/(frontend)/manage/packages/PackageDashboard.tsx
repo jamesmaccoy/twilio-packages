@@ -93,6 +93,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
   const [availableProducts, setAvailableProducts] = useState<AvailableProduct[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [postStatus, setPostStatus] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [isDeletingPackage, setIsDeletingPackage] = useState(false);
@@ -154,6 +155,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
 
       const packages = packagesData.docs || [];
       const packageSettings = postData.doc?.packageSettings || [];
+      setPostStatus(typeof postData?.doc?._status === 'string' ? postData.doc._status : null);
       
       // Create a map of package settings by package ID
       const settingsMap = new Map();
@@ -249,7 +251,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
           title: '🏖️ Two Week Paradise',
           description: 'Perfect for a refreshing getaway',
           price: 299.99,
-          currency: 'USD',
+          currency: 'ZAR',
           period: 'week',
           periodCount: 2,
           category: 'standard',
@@ -262,7 +264,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
           title: '✨ Luxury Hours',
           description: 'Premium hourly service with VIP treatment',
           price: 75.00,
-          currency: 'USD',
+          currency: 'ZAR',
           period: 'hour',
           periodCount: 1,
           category: 'hosted',
@@ -500,10 +502,13 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
     return Math.round((randsValue * multiplier) / tokenRatio);
   };
 
+  const isListingPublished = postStatus === 'published';
+  const isListingDraft = postStatus != null && postStatus !== 'published';
+
   const calculateStats = () => {
     const totalPackages = packages.length;
     const totalRevenue = packages.reduce((acc, pkg) => acc + (pkg.baseRate || 0), 0);
-    const activePackages = packages.filter((p) => p.isEnabled).length;
+    const activePackages = packages.filter((p) => p.isEnabled && isListingPublished).length;
     const avgMinNights = packages.length > 0
       ? packages.reduce((acc, pkg) => acc + pkg.minNights, 0) / totalPackages
       : 0;
@@ -648,6 +653,16 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
           </Alert>
         )}
 
+        {isListingDraft && (
+          <Alert className="mb-6 bg-slate-50 border-slate-200 dark:bg-muted/30 dark:border-border">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="text-slate-700 dark:text-muted-foreground">
+              This property is in <strong>Draft</strong>. Packages are visible to you here, but they’re{' '}
+              <strong>inactive for customers</strong> until you publish the property.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Stats Grid */}
         {packages.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
@@ -713,7 +728,10 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
               {packages.map((pkg) => (
                 <div
                   key={pkg.id}
-                  className="group bg-white dark:bg-card rounded-xl border border-slate-200 dark:border-border overflow-hidden hover:shadow-md transition-all duration-300 flex flex-col h-full"
+                  className={[
+                    "group bg-white dark:bg-card rounded-xl border border-slate-200 dark:border-border overflow-hidden transition-all duration-300 flex flex-col h-full",
+                    isListingDraft ? "opacity-70 hover:opacity-90" : "hover:shadow-md",
+                  ].join(" ")}
                 >
                   {/* Card Header / Visual Anchor */}
                   <div className="h-32 bg-slate-50 dark:bg-muted/40 border-b border-slate-100 dark:border-border p-6 flex items-center justify-center relative">
@@ -721,13 +739,13 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
                       {pkg.name.split(' ')[0] || '📦'}
                     </div>
                     <div className="absolute top-4 right-4">
-                      {pkg.isEnabled ? (
+                      {pkg.isEnabled && isListingPublished ? (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
                           Active
                         </span>
                       ) : (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-muted text-slate-600 dark:text-muted-foreground border border-slate-200 dark:border-border">
-                          Inactive
+                          {isListingDraft ? 'Inactive (draft)' : 'Inactive'}
                         </span>
                       )}
                     </div>
@@ -749,6 +767,12 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
                     <p className="text-sm text-slate-500 dark:text-muted-foreground mb-4 line-clamp-2 flex-1">
                       {pkg.description || 'No description provided'}
                     </p>
+
+                    {isListingDraft ? (
+                      <div className="mb-3 rounded-lg border border-slate-200 dark:border-border bg-slate-50/60 dark:bg-muted/30 px-3 py-2 text-xs text-slate-600 dark:text-muted-foreground">
+                        Customers won’t see this package until the property is published.
+                      </div>
+                    ) : null}
 
                     {/* Metrics Grid */}
                     <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-sm border-t border-slate-100 dark:border-border pt-4 mt-auto">
