@@ -1,11 +1,69 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import configPromise from '@payload-config'
+import jwt from 'jsonwebtoken'
+
+async function getAuthedUser(payload: any, req: NextRequest): Promise<any | null> {
+  let user: any = null
+  try {
+    const authResult = await payload.auth({ headers: req.headers })
+    user = authResult.user
+  } catch {
+    user = null
+  }
+
+  const prefixToken = req.cookies.get(`${payload.config.cookiePrefix}-token`)?.value
+  const legacyToken = req.cookies.get('payload-token')?.value
+  const authTokens = [prefixToken, legacyToken].filter(
+    (token, index, self): token is string => Boolean(token) && self.indexOf(token) === index,
+  )
+
+  // Try authenticating with cookies by injecting Authorization header.
+  if (!user && authTokens.length > 0) {
+    for (const token of authTokens) {
+      try {
+        const headersWithToken = new Headers(req.headers)
+        headersWithToken.set('authorization', `JWT ${token}`)
+        const tokenAuthResult = await payload.auth({ headers: headersWithToken })
+        if (tokenAuthResult.user) {
+          user = tokenAuthResult.user
+          break
+        }
+      } catch {
+        continue
+      }
+    }
+  }
+
+  // Final fallback: verify JWT and load user directly.
+  if (!user && authTokens.length > 0) {
+    for (const token of authTokens) {
+      try {
+        const decoded = jwt.verify(token, payload.secret) as unknown
+        const id =
+          typeof decoded === 'object' && decoded !== null && 'id' in decoded ? (decoded as any).id : null
+        if (typeof id === 'string' && id.length > 0) {
+          user = await payload.findByID({
+            collection: 'users',
+            id,
+            overrideAccess: true,
+            depth: 0,
+          })
+          break
+        }
+      } catch {
+        continue
+      }
+    }
+  }
+
+  return user || null
+}
 
 export async function GET(request: NextRequest) {
   try {
     const payload = await getPayload({ config: configPromise })
-    const { user } = await payload.auth({ headers: request.headers })
+    const user = await getAuthedUser(payload, request)
 
     if (!user) {
       return NextResponse.json({ hasActiveSubscription: false, activeEntitlements: [] }, { status: 200 })

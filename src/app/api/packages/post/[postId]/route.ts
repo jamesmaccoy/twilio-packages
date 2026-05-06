@@ -125,45 +125,8 @@ export async function GET(
       overrideAccess: false,
     })
     
-    // Debug: Check if specific package is in database results
-    const targetPackage = dbPackages.docs.find((pkg: any) => pkg.id === '68a587e7420e4517de8d2b2d')
-    if (targetPackage) {
-      console.log('✅ Package found in database query:', {
-        id: targetPackage.id,
-        name: targetPackage.name,
-        category: targetPackage.category,
-        isEnabled: targetPackage.isEnabled,
-        postId: (targetPackage.post as any)?.id || targetPackage.post,
-        expectedPostId: postId
-      })
-    } else {
-      console.log('❌ Package NOT found in database query for post:', postId)
-      console.log('Total packages found:', dbPackages.docs.length)
-      console.log('Package IDs found:', dbPackages.docs.map((pkg: any) => ({ id: pkg.id, name: pkg.name, category: pkg.category })))
-      
-      // Try to find the package directly to see why it's not in the query
-      try {
-        const directPackage = await payload.findByID({
-          collection: 'packages',
-          id: '68a587e7420e4517de8d2b2d',
-          depth: 1,
-          user: user || undefined,
-          overrideAccess: false,
-        })
-        console.log('🔍 Direct package lookup:', {
-          id: directPackage.id,
-          name: directPackage.name,
-          category: directPackage.category,
-          isEnabled: directPackage.isEnabled,
-          postId: (directPackage.post as any)?.id || directPackage.post,
-          postType: typeof directPackage.post,
-          expectedPostId: postId,
-          postMatches: String((directPackage.post as any)?.id || directPackage.post) === String(postId)
-        })
-      } catch (error) {
-        console.log('❌ Could not find package directly:', error)
-      }
-    }
+    // Note: this route previously included hardcoded debug lookups for a specific package id.
+    // Those checks were noisy in production logs once that package id no longer existed.
 
     // Get Yoco products
     const yocoProducts = await yocoService.getProducts()
