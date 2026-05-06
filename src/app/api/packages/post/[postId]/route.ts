@@ -3,6 +3,57 @@ import { getPayload } from 'payload'
 import configPromise from '@/payload.config'
 import { yocoService } from '@/lib/yocoService'
 import { getCustomerEntitlement, type CustomerEntitlement } from '@/utils/packageSuggestions'
+import jwt from 'jsonwebtoken'
+
+async function getAuthedUser(payload: any, request: NextRequest): Promise<any | null> {
+  let user: any = null
+  try {
+    const authResult = await payload.auth({ headers: request.headers })
+    user = authResult.user
+  } catch {
+    user = null
+  }
+
+  const prefixToken = request.cookies.get(`${payload.config.cookiePrefix}-token`)?.value
+  const legacyToken = request.cookies.get('payload-token')?.value
+  const authTokens = [prefixToken, legacyToken].filter(
+    (token, index, self): token is string => Boolean(token) && self.indexOf(token) === index,
+  )
+
+  if (!user && authTokens.length > 0) {
+    for (const token of authTokens) {
+      try {
+        const headersWithToken = new Headers(request.headers)
+        headersWithToken.set('authorization', `JWT ${token}`)
+        const tokenAuthResult = await payload.auth({ headers: headersWithToken })
+        if (tokenAuthResult.user) {
+          user = tokenAuthResult.user
+          break
+        }
+      } catch {
+        continue
+      }
+    }
+  }
+
+  if (!user && authTokens.length > 0) {
+    for (const token of authTokens) {
+      try {
+        const decoded = jwt.verify(token, payload.secret) as unknown
+        const id =
+          typeof decoded === 'object' && decoded !== null && 'id' in decoded ? (decoded as any).id : null
+        if (typeof id === 'string' && id.length > 0) {
+          user = await payload.findByID({ collection: 'users', id, overrideAccess: true, depth: 0 })
+          break
+        }
+      } catch {
+        continue
+      }
+    }
+  }
+
+  return user || null
+}
 
 export async function GET(
   request: NextRequest,
@@ -13,11 +64,8 @@ export async function GET(
     const { postId } = await params
     
     // Get user and determine entitlement
-    let user = null
-    try {
-      const authResult = await payload.auth({ headers: request.headers })
-      user = authResult.user
-    } catch (authError) {
+    const user = await getAuthedUser(payload, request)
+    if (!user) {
       // User not authenticated - default to 'none' entitlement
       console.log('No authenticated user, defaulting to entitlement: none')
     }
@@ -293,62 +341,12 @@ export async function GET(
       })),
     })
 
+    // IMPORTANT: Do not entitlement-filter on the server.
+    // The client (SmartEstimateBlock) has the most accurate subscription context via `/api/check-subscription`
+    // and will filter packages by entitlement consistently.
     const allPackages = combinedPackages
-      .filter(pkg => {
-        // Debug logging for specific package
-        if (pkg.id === '68a587e7420e4517de8d2b2d') {
-          console.log('🔍 Debug package filtering:', {
-            packageId: pkg.id,
-            packageName: pkg.name,
-            category: pkg.category,
-            isEnabled: pkg.isEnabled,
-            customerEntitlement,
-            willPassEnabledFilter: pkg.isEnabled,
-            willPassCategoryFilter: pkg.category !== 'addon' && (
-              customerEntitlement === 'pro' || 
-              (customerEntitlement === 'none' && ['hosted', 'special'].includes(String(pkg.category || ''))) ||
-              (customerEntitlement === 'standard' && ['standard', 'hosted', 'special'].includes(String(pkg.category || '')))
-            )
-          })
-        }
-        return pkg.isEnabled // Only include enabled packages
-      })
-      .filter(pkg => {
-        // Filter out addon packages - these should only appear on the booking page
-        if (pkg.category === 'addon') {
-          return false
-        }
-
-        // Entitlement-based gating (preferred).
-        // Treat missing entitlement as 'standard' (safe default).
-        const raw = (pkg as any).entitlement
-        const pkgEntitlement: CustomerEntitlement =
-          raw === 'none' || raw === 'standard' || raw === 'pro' ? raw : 'standard'
-
-        if (customerEntitlement === 'none') {
-          const include = pkgEntitlement === 'none'
-          if (pkgEntitlement === 'none' || raw === 'none') {
-            console.log('🔍 Entitlement filter (customer none):', {
-              packageId: (pkg as any).id,
-              name: (pkg as any).name,
-              category: (pkg as any).category,
-              rawEntitlement: raw,
-              pkgEntitlement,
-              include,
-            })
-          }
-          return include
-        }
-        if (customerEntitlement === 'standard') return pkgEntitlement === 'none' || pkgEntitlement === 'standard'
-        if (customerEntitlement === 'pro') return true
-        
-        // Legacy: Filter out pro-only packages by yocoId for non-pro users
-        if (pkg.yocoId === 'gathering_monthly' && customerEntitlement !== 'pro') {
-          return false
-        }
-        
-        return true
-      })
+      .filter((pkg: any) => Boolean(pkg?.isEnabled))
+      .filter((pkg: any) => String(pkg?.category || '').trim().toLowerCase() !== 'addon')
 
     // Debug logging
     console.log('📦 Package filtering summary:', {

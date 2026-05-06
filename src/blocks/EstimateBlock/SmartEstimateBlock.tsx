@@ -1761,7 +1761,7 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
   useEffect(() => {
     if (!loadedRef.current && !loadingRef.current) {
       loadingRef.current = true
-      fetch(`/api/packages/post/${postId}`)
+      fetch(`/api/packages/post/${postId}`, { credentials: 'include' })
         .then(res => res.json())
         .then(data => {
           
@@ -2062,7 +2062,7 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
       appendMessageToThread(threadId, packageMessage)
     } else {
       // Fallback: load packages if none exist
-      fetch(`/api/packages/post/${postId}`)
+      fetch(`/api/packages/post/${postId}`, { credentials: 'include' })
         .then(res => res.json())
         .then(data => {
           // Apply entitlement filtering first
@@ -2523,7 +2523,7 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
           trimmedMessage.toLowerCase().includes('debug') ||
           trimmedMessage.toLowerCase().includes('show packages')) {
         try {
-          const response = await fetch(`/api/packages/post/${postId}`)
+          const response = await fetch(`/api/packages/post/${postId}`, { credentials: 'include' })
           if (response.ok) {
             const data = await response.json()
             if (activeThreadRef.current !== threadId) return
