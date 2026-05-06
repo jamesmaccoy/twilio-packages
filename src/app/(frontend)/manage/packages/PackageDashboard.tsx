@@ -27,7 +27,7 @@ interface Package {
   category: 'standard' | 'hosted' | 'addon' | 'special';
   multiplier: number;
   features: string[];
-  entitlement?: 'standard' | 'pro';
+  entitlement?: 'none' | 'standard' | 'pro';
 }
 
 interface AvailableProduct {
@@ -40,7 +40,7 @@ interface AvailableProduct {
   periodCount: number;
   category: 'standard' | 'hosted' | 'addon' | 'special';
   features: string[];
-  entitlement?: 'standard' | 'pro';
+  entitlement?: 'none' | 'standard' | 'pro';
   icon?: string;
 }
 
@@ -936,6 +936,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
                                       <SelectValue placeholder="Select entitlement" />
                                     </SelectTrigger>
                                     <SelectContent>
+                                      <SelectItem value="none">None</SelectItem>
                                       <SelectItem value="standard">Standard</SelectItem>
                                       <SelectItem value="pro">Pro</SelectItem>
                                     </SelectContent>

@@ -10,7 +10,7 @@ interface PackagePreviewProps {
   name: string
   description: string
   category: 'standard' | 'hosted' | 'addon' | 'special'
-  entitlement?: 'standard' | 'pro'
+  entitlement?: 'none' | 'standard' | 'pro'
   minNights?: number
   maxNights?: number
   baseRate?: number // in rands (ZAR)

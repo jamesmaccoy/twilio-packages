@@ -468,29 +468,16 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
       if (pkg.category === 'addon') {
         return false
       }
-      
-      const normalizedCategory = String(pkg.category || '').trim().toLowerCase()
 
-      // 3-Tier System Implementation:
-      
-      // Tier 1: Non-subscribers (none) - Only see hosted/special packages (premium experience)
-      if (customerEntitlement === 'none') {
-        return ['hosted', 'special'].includes(normalizedCategory)
-      }
-      
-      // Tier 2: Standard subscribers - See standard + hosted + special (better than non-subscribers)
-      if (customerEntitlement === 'standard') {
-        // Standard subscribers get more than non-subscribers
-        const shouldShow = ['standard', 'hosted', 'special'].includes(normalizedCategory)
-        
-        
-        return shouldShow
-      }
-      
-      // Tier 3: Pro subscribers - See everything (all packages)
-      if (customerEntitlement === 'pro') {
-        return true
-      }
+      const pkgEntitlement = (pkg.entitlement || 'standard') as CustomerEntitlement
+
+      // Entitlement-based gating (preferred).
+      // - entitlement=none: visible to everyone (including guests / unsubscribed)
+      // - entitlement=standard: requires standard or pro
+      // - entitlement=pro: requires pro
+      if (customerEntitlement === 'none') return pkgEntitlement === 'none'
+      if (customerEntitlement === 'standard') return pkgEntitlement === 'none' || pkgEntitlement === 'standard'
+      if (customerEntitlement === 'pro') return true
       
       // Legacy: Filter out pro-only packages by yocoId for non-pro users
         // Only keep this for packages that don't have entitlement field in database
@@ -1785,34 +1772,11 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
             // Filter out addon packages - these should only appear on the booking page
             if (pkg.category === 'addon') return false
             
-            // 3-Tier System Implementation:
-            
-            // Tier 1: Non-subscribers (none) - Only see hosted/special packages (premium experience)
-            if (customerEntitlement === 'none') {
-              return ['hosted', 'special'].includes(pkg.category)
-            }
-            
-            // Tier 2: Standard subscribers - See standard + hosted + special (better than non-subscribers)
-            if (customerEntitlement === 'standard') {
-              // Standard subscribers get more than non-subscribers
-              const normalizedCategory = String(pkg.category || '').trim().toLowerCase()
-              const shouldShow = ['standard', 'hosted', 'special'].includes(normalizedCategory)
-              
-              console.log('🔍 Inline Standard subscriber package check:', {
-                packageName: pkg.name,
-                packageCategory: pkg.category,
-                packageEntitlement: pkg.entitlement,
-                shouldShow,
-                reason: shouldShow ? `Package category '${pkg.category}' is available to Standard subscribers` : `Package category '${pkg.category}' is not available to Standard subscribers`
-              })
-              
-              return shouldShow
-            }
-            
-            // Tier 3: Pro subscribers - See everything (all packages)
-            if (customerEntitlement === 'pro') {
-              return true
-            }
+            const pkgEntitlement = (pkg.entitlement || 'standard') as CustomerEntitlement
+
+            if (customerEntitlement === 'none') return pkgEntitlement === 'none'
+            if (customerEntitlement === 'standard') return pkgEntitlement === 'none' || pkgEntitlement === 'standard'
+            if (customerEntitlement === 'pro') return true
             
             // Legacy: Filter out pro-only packages for non-pro users
             // Only keep this for packages that don't have entitlement field in database

@@ -107,6 +107,7 @@ export async function GET(
         id: pkg.id,
         name: pkg.name,
         category: pkg.category,
+        entitlement: (pkg as any).entitlement ?? null,
         isEnabled: pkg.isEnabled,
         postId: (pkg.post as any)?.id || pkg.post
       }))
@@ -209,8 +210,8 @@ export async function GET(
       }
     }
     
-    // Combine database packages with Yoco products
-    const allPackages = [
+    // Combine database packages with Yoco products (before filtering)
+    const combinedPackages = [
       ...dbPackages.docs.map(pkg => {
         const customName = getCustomName(pkg.id)
         // Map revenueCatId to yocoId for backward compatibility
@@ -276,6 +277,23 @@ export async function GET(
         }
       })
     ]
+
+    // Debug: show entitlements for DB packages
+    console.log('🔍 Combined packages (pre-filter):', {
+      postId,
+      customerEntitlement,
+      total: combinedPackages.length,
+      sample: combinedPackages.slice(0, 10).map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        category: p.category,
+        entitlement: p.entitlement,
+        isEnabled: p.isEnabled,
+        source: p.source,
+      })),
+    })
+
+    const allPackages = combinedPackages
       .filter(pkg => {
         // Debug logging for specific package
         if (pkg.id === '68a587e7420e4517de8d2b2d') {
@@ -300,49 +318,29 @@ export async function GET(
         if (pkg.category === 'addon') {
           return false
         }
-        
-        const normalizedCategory = String(pkg.category || '').trim().toLowerCase()
-        const requiredEntitlementRaw = (pkg as any).entitlement
-        const requiredEntitlement =
-          requiredEntitlementRaw === 'none' || requiredEntitlementRaw == null
-            ? null
-            : String(requiredEntitlementRaw)
 
-        const meetsExplicitEntitlement = (() => {
-          if (!requiredEntitlement) return true
-          if (requiredEntitlement === 'pro') return customerEntitlement === 'pro'
-          if (requiredEntitlement === 'standard')
-            return customerEntitlement === 'standard' || customerEntitlement === 'pro'
-          // Unknown entitlement value: be safe and hide from lower tiers
-          return customerEntitlement === 'pro'
-        })()
+        // Entitlement-based gating (preferred).
+        // Treat missing entitlement as 'standard' (safe default).
+        const raw = (pkg as any).entitlement
+        const pkgEntitlement: CustomerEntitlement =
+          raw === 'none' || raw === 'standard' || raw === 'pro' ? raw : 'standard'
 
-        if (!meetsExplicitEntitlement) return false
-
-        // Filter packages based on customer entitlement (3-Tier System):
-        // Tier 1: Non-subscribers (none) - Only see hosted/special packages.
         if (customerEntitlement === 'none') {
-          const shouldInclude = ['hosted', 'special'].includes(normalizedCategory)
-          if (pkg.id === '68a587e7420e4517de8d2b2d') {
-            console.log('🔍 Package entitlement check (none):', {
-              packageId: pkg.id,
-              category: normalizedCategory,
-              shouldInclude,
-              allowedCategories: ['hosted', 'special']
+          const include = pkgEntitlement === 'none'
+          if (pkgEntitlement === 'none' || raw === 'none') {
+            console.log('🔍 Entitlement filter (customer none):', {
+              packageId: (pkg as any).id,
+              name: (pkg as any).name,
+              category: (pkg as any).category,
+              rawEntitlement: raw,
+              pkgEntitlement,
+              include,
             })
           }
-          return shouldInclude
+          return include
         }
-        
-        // Tier 2: Standard subscribers - See standard + hosted + special (better than non-subscribers)
-        if (customerEntitlement === 'standard') {
-          return ['standard', 'hosted', 'special'].includes(normalizedCategory)
-        }
-        
-        // Tier 3: Pro subscribers - See everything (all packages)
-        if (customerEntitlement === 'pro') {
-          return true
-        }
+        if (customerEntitlement === 'standard') return pkgEntitlement === 'none' || pkgEntitlement === 'standard'
+        if (customerEntitlement === 'pro') return true
         
         // Legacy: Filter out pro-only packages by yocoId for non-pro users
         if (pkg.yocoId === 'gathering_monthly' && customerEntitlement !== 'pro') {
