@@ -44,8 +44,27 @@ export async function GET(request: NextRequest) {
       return new Date(tx.expiresAt) > now
     })
 
-    const hasActiveSubscription = Boolean(activeTransaction)
-    const activeEntitlements = activeTransaction?.entitlement ? [activeTransaction.entitlement] : []
+    // Primary source of truth: subscription transactions
+    let hasActiveSubscription = Boolean(activeTransaction)
+    let activeEntitlements = activeTransaction?.entitlement ? [activeTransaction.entitlement] : []
+
+    // Fallback: user.subscriptionStatus (e.g. legacy/manual subscription flag)
+    // This prevents "paid but no yoco-transactions record" from being treated as unsubscribed.
+    if (!hasActiveSubscription) {
+      const sub = (user as any)?.subscriptionStatus
+      const status = sub?.status
+      const expiresAt = sub?.expiresAt
+      const plan = String(sub?.plan || '').toLowerCase()
+
+      const notExpired =
+        !expiresAt || (typeof expiresAt === 'string' && expiresAt.length > 0 ? new Date(expiresAt) > now : false)
+
+      if (status === 'active' && notExpired) {
+        hasActiveSubscription = true
+        const entitlement = plan === 'pro' ? 'pro' : 'standard'
+        activeEntitlements = [entitlement]
+      }
+    }
 
     const response = NextResponse.json({
       hasActiveSubscription,

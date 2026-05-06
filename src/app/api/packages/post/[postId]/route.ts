@@ -25,6 +25,19 @@ export async function GET(
     let customerEntitlement: CustomerEntitlement = 'none'
     
     if (user) {
+      // Prefer the user's persisted subscriptionStatus when present (some flows don't create a yoco-transaction record).
+      // Map plan -> entitlement: basic/standard => 'standard', pro => 'pro'.
+      const sub = (user as any)?.subscriptionStatus
+      const status = sub?.status
+      const expiresAt = sub?.expiresAt
+      const plan = String(sub?.plan || '').toLowerCase()
+
+      const notExpired =
+        !expiresAt || (typeof expiresAt === 'string' && expiresAt.length > 0 ? new Date(expiresAt) > new Date() : false)
+
+      if (status === 'active' && notExpired) {
+        customerEntitlement = plan === 'pro' ? 'pro' : 'standard'
+      } else {
       // Check for active subscription
       const now = new Date()
       const transactions = await payload.find({
@@ -56,6 +69,7 @@ export async function GET(
       }
       
       customerEntitlement = getCustomerEntitlement(subscriptionStatus)
+      }
     }
     
     // Get the post data to access packageSettings for custom names
