@@ -164,8 +164,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
         settingsMap.set(pkgId, setting);
       });
       
-      setPackages(
-        packages.map((pkg: any) => {
+      const nextPackages: Package[] = packages.map((pkg: any) => {
           const settings = settingsMap.get(pkg.id);
           const rawRevenueCatId = typeof pkg.revenueCatId === 'string' ? pkg.revenueCatId : undefined;
           const normalisedRevenueCatId =
@@ -185,8 +184,10 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
             features: pkg.features || [],
             entitlement: pkg.entitlement || 'standard',
           };
-        })
-      );
+        });
+
+      setPackages(nextPackages);
+      return nextPackages;
     } catch (err: any) {
       setError(err.message || 'Failed to load packages');
     } finally {
@@ -194,41 +195,78 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
     }
   }, [postId]);
 
-  // Auto-open onboarding when the parent asks for it (e.g. after creating a new property)
+  const createPackageAndOpenEditor = useCallback(async () => {
+    setError(null)
+    setSuccess(null)
+    try {
+      const res = await fetch('/api/packages/seed-from-post', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId, forceNew: true }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || `Failed to create package (HTTP ${res.status})`)
+      const packageId = typeof data?.packageId === 'string' ? data.packageId.trim() : ''
+      if (!packageId) throw new Error('Package created but no packageId returned')
+
+      // Ensure the created package is visible before opening the edit dialog.
+      // Sometimes the first refresh races the DB write, so we do a quick follow-up fetch by id.
+      const next = await loadPackages()
+      let created = Array.isArray(next) ? next.find((p) => p.id === packageId) : null
+      if (!created) {
+        const byIdRes = await fetch(`/api/packages/${packageId}?depth=0`, { credentials: 'include' })
+        const byId = await byIdRes.json().catch(() => null)
+        if (byIdRes.ok && byId) {
+          created = {
+            id: String(byId?.id || packageId),
+            name: String(byId?.name || 'Package'),
+            description: String(byId?.description || ''),
+            isEnabled: Boolean(byId?.isEnabled ?? false),
+            customName: undefined,
+            minNights: Number(byId?.minNights ?? 1),
+            maxNights: Number(byId?.maxNights ?? 7),
+            revenueCatId: typeof byId?.revenueCatId === 'string' ? byId.revenueCatId : undefined,
+            baseRate: typeof byId?.baseRate === 'number' ? byId.baseRate : undefined,
+            category: (byId?.category || 'standard') as any,
+            multiplier: typeof byId?.multiplier === 'number' ? byId.multiplier : 1,
+            features: Array.isArray(byId?.features)
+              ? byId.features.map((f: any) => (typeof f === 'string' ? f : f?.feature)).filter(Boolean)
+              : [],
+            entitlement: (byId?.entitlement || 'standard') as any,
+          } as Package
+
+          // Insert it optimistically so the dialog can open even if list refresh lags.
+          setPackages((prev) => {
+            if (prev.some((p) => p.id === created!.id)) return prev
+            return [created!, ...prev]
+          })
+        }
+      }
+
+      if (created) setEditingPackage(created)
+    } catch (e: any) {
+      setError(e?.message || 'Failed to create package')
+    }
+  }, [postId, loadPackages])
+
+  // Auto-open editor when the parent asks for it (e.g. after creating a new property)
   useEffect(() => {
     if (!startOnboarding) return;
     let cancelled = false;
     async function seedAndOpen() {
       try {
-        // Create a real draft package immediately so returning to the dashboard shows it.
-        const res = await fetch('/api/packages/seed-from-post', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ postId }),
-        });
-        const data = await res.json();
-        const packageId = data?.packageId;
         if (cancelled) return;
-
-        if (res.ok && typeof packageId === 'string' && packageId.trim()) {
-          setOnboardingExistingPackageId(packageId.trim());
-        } else {
-          // Fallback: allow normal create flow if seeding fails
-          setOnboardingExistingPackageId(null);
-        }
+        await createPackageAndOpenEditor()
       } catch {
-        if (cancelled) return;
-        setOnboardingExistingPackageId(null);
-      } finally {
-        if (cancelled) return;
-        setShowOnboarding(true);
+        // ignore
       }
     }
     seedAndOpen();
     return () => {
       cancelled = true;
     };
-  }, [startOnboarding]);
+  }, [startOnboarding, createPackageAndOpenEditor]);
 
   const loadAvailableProducts = async () => {
     try {
@@ -437,6 +475,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
         // Update the package record directly
         const packageUpdateRes = await fetch(`/api/packages/${pkg.id}`, {
           method: "PATCH",
+          credentials: 'include',
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name: pkg.name,
@@ -463,6 +502,7 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
       // Also update the post's packageSettings for custom names
       const postUpdateRes = await fetch(`/api/posts/${postId}`, {
         method: "PATCH",
+        credentials: 'include',
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           packageSettings: packages.map(pkg => ({
@@ -474,7 +514,10 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
         }),
       });
       
-      if (!postUpdateRes.ok) throw new Error("Failed to save package settings");
+      if (!postUpdateRes.ok) {
+        const data = await postUpdateRes.json().catch(() => null)
+        throw new Error(data?.error || `Failed to save package settings (HTTP ${postUpdateRes.status})`)
+      }
       
       setSuccess("All package changes saved successfully!");
       
@@ -551,8 +594,8 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
   );
 
   const openCreatePackageOnboarding = () => {
-    setOnboardingExistingPackageId(null);
-    setShowOnboarding(true);
+    // Skip AI preview flow; create and go straight to the edit dialog.
+    void createPackageAndOpenEditor()
   };
 
   const openRefinePackageOnboarding = (packageId: string) => {

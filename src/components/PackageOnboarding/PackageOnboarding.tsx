@@ -314,6 +314,7 @@ export function PackageOnboarding({
       // Persist directly to the DB (do not rely on the model to call createPackageTool).
       const res = await fetch(`/api/packages`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           post: packagePostId,

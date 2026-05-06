@@ -115,6 +115,52 @@ export async function POST(request: NextRequest) {
     } catch {
       user = null
     }
+
+    // Fallback: if Payload didn't pick up cookies, try JWT header auth using cookie token.
+    const prefixToken = request.cookies.get(`${payload.config.cookiePrefix}-token`)?.value
+    const legacyToken = request.cookies.get('payload-token')?.value
+    const authTokens = [prefixToken, legacyToken].filter(
+      (token, index, self): token is string => Boolean(token) && self.indexOf(token) === index,
+    )
+
+    if (!user && authTokens.length > 0) {
+      for (const token of authTokens) {
+        try {
+          const headersWithToken = new Headers(request.headers)
+          headersWithToken.set('authorization', `JWT ${token}`)
+          const tokenAuthResult = await payload.auth({ headers: headersWithToken })
+          if (tokenAuthResult.user) {
+            user = tokenAuthResult.user
+            break
+          }
+        } catch {
+          continue
+        }
+      }
+    }
+
+    // Final fallback: directly verify JWT and load user.
+    if (!user && authTokens.length > 0) {
+      for (const token of authTokens) {
+        try {
+          const decoded = jwt.verify(token, payload.secret) as unknown
+          const id =
+            typeof decoded === 'object' && decoded !== null && 'id' in decoded
+              ? (decoded as any).id
+              : null
+          if (typeof id === 'string' && id.length > 0) {
+            user = await payload.findByID({
+              collection: 'users',
+              id,
+              overrideAccess: true,
+            })
+            break
+          }
+        } catch {
+          continue
+        }
+      }
+    }
     
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

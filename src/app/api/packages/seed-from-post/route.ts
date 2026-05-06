@@ -32,19 +32,23 @@ export async function POST(req: NextRequest) {
 
   const postId = typeof body?.postId === 'string' ? body.postId.trim() : ''
   if (!postId) return NextResponse.json({ error: 'postId is required' }, { status: 400 })
+  const forceNew = body?.forceNew === true
 
   const payload = await getPayload({ config: configPromise })
 
-  // If the post already has at least one package, do not auto-seed another.
-  const existing = await payload.find({
-    collection: 'packages',
-    where: { post: { equals: postId } },
-    limit: 1,
-    depth: 0,
-    user,
-  })
-  if (existing?.docs?.[0]) {
-    return NextResponse.json({ success: true, packageId: existing.docs[0].id, alreadyExisted: true })
+  // Back-compat: if a caller expects idempotent behavior, return the first package.
+  // For the dashboard "New Package" button we explicitly pass `forceNew: true`.
+  if (!forceNew) {
+    const existing = await payload.find({
+      collection: 'packages',
+      where: { post: { equals: postId } },
+      limit: 1,
+      depth: 0,
+      user,
+    })
+    if (existing?.docs?.[0]) {
+      return NextResponse.json({ success: true, packageId: existing.docs[0].id, alreadyExisted: true })
+    }
   }
 
   const post = await payload.findByID({ collection: 'posts', id: postId, depth: 1, user })
@@ -100,6 +104,7 @@ Rules:
     success: true,
     packageId: seeded.id,
     alreadyExisted: false,
+    forced: forceNew,
     name: seeded.name,
     description: seeded.description,
   })
