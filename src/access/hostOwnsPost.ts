@@ -24,6 +24,8 @@ export const hostOwnsPost: Access<User> = ({ req: { user } }) => {
   if (isHostUser(user)) {
     return {
       or: [
+        // Hosts should be able to browse the public site like anyone else.
+        { _status: { equals: 'published' } },
         { host: { equals: user.id } },
         // `authors` is a hasMany relationship; `equals` matches if any item equals the value.
         { authors: { equals: user.id } },
