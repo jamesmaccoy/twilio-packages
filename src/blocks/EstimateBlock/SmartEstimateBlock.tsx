@@ -946,7 +946,7 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
     const restoreEstimateId = searchParams?.get('restoreEstimate')
     if (restoreEstimateId && isLoggedIn && !restored) {
       // Fetch the estimate directly by ID to get its actual postId
-      fetch(`/api/estimates/${restoreEstimateId}`)
+      fetch(`/api/estimates/${restoreEstimateId}`, { credentials: 'include' })
         .then(res => res.json())
         .then(estimate => {
           if (estimate && estimate.id === restoreEstimateId) {

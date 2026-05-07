@@ -37,7 +37,7 @@ export function BookingsAIAssistant({ userId, upcomingBookings, pastBookings }: 
         if (restoreEstimateId && !estimateRestoredRef.current) {
           // Fetch the specific estimate to restore
           try {
-            const restoreResponse = await fetch(`/api/estimates/${restoreEstimateId}`)
+            const restoreResponse = await fetch(`/api/estimates/${restoreEstimateId}`, { credentials: 'include' })
             if (restoreResponse.ok) {
               const restoreEstimate = await restoreResponse.json()
               // Verify it belongs to the user

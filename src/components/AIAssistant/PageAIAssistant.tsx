@@ -1418,7 +1418,7 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
   // Function to restore estimate manually
   const handleRestoreEstimate = useCallback(async (estimateId: string) => {
     try {
-      const response = await fetch(`/api/estimates/${estimateId}`)
+      const response = await fetch(`/api/estimates/${estimateId}`, { credentials: 'include' })
       if (response.ok) {
         const estimate = await response.json()
         setRestoredEstimate(estimate)

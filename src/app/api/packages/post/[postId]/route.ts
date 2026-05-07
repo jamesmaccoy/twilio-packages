@@ -127,8 +127,9 @@ export async function GET(
         collection: 'posts',
         id: postId,
         depth: 1,
-        user: user || undefined,
-        overrideAccess: false,
+        // This endpoint serves customer-facing package selection; do not rely on collection-level access control.
+        // We still restrict by postId and isEnabled later.
+        overrideAccess: true,
       })
     } catch (error) {
       // Don't log the full error to reduce noise, just continue without custom names
@@ -144,8 +145,7 @@ export async function GET(
       },
       depth: 2,
       limit: 100, // Increase limit to ensure we get all packages
-      user: user || undefined,
-      overrideAccess: false,
+      overrideAccess: true,
     })
     
     console.log('🔍 All packages for post (before isEnabled filter):', {
@@ -170,8 +170,7 @@ export async function GET(
       },
       depth: 2, // Increased depth to include related page data
       limit: 100, // Increase limit to ensure we get all packages
-      user: user || undefined,
-      overrideAccess: false,
+      overrideAccess: true,
     })
     
     // Note: this route previously included hardcoded debug lookups for a specific package id.
