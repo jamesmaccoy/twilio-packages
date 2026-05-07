@@ -339,6 +339,7 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
   
   // Ref to store original packages for re-filtering
   const originalPackagesRef = useRef<Package[]>([])
+  const lastPackagesFetchKeyRef = useRef<string | null>(null)
 
   // Tracks whether the user explicitly chose a package (so we don't override their choice).
   const userSelectedPackageRef = useRef(false)
@@ -509,6 +510,45 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
       return (b.multiplier || 1) - (a.multiplier || 1)
     })
   }, [])
+
+  const fetchPackagesForPost = useCallback(async () => {
+    const fetchKey = `${postId}:${customerEntitlement}`
+    if (loadingRef.current) return
+    if (lastPackagesFetchKeyRef.current === fetchKey) return
+
+    loadingRef.current = true
+    lastPackagesFetchKeyRef.current = fetchKey
+
+    try {
+      const res = await fetch(`/api/packages/post/${postId}`, {
+        credentials: 'include',
+        cache: 'no-store',
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || `Failed to load packages (HTTP ${res.status})`)
+
+      const filtered = (data?.packages || []).filter((pkg: Package) => {
+        if (!pkg.isEnabled) return false
+        if (pkg.category === 'addon') return false
+
+        const pkgEntitlement = (pkg.entitlement || 'standard') as CustomerEntitlement
+        if (customerEntitlement === 'none') return pkgEntitlement === 'none'
+        if (customerEntitlement === 'standard') return pkgEntitlement === 'standard'
+        if (customerEntitlement === 'pro') return pkgEntitlement === 'standard' || pkgEntitlement === 'pro'
+
+        if (pkg.yocoId === 'gathering_monthly' && customerEntitlement !== 'pro') return false
+        return true
+      })
+
+      originalPackagesRef.current = data?.packages || []
+      setPackages(sortPackagesForDisplay(filtered))
+      loadedRef.current = true
+    } catch (e) {
+      console.error('Error loading packages:', e)
+    } finally {
+      loadingRef.current = false
+    }
+  }, [postId, customerEntitlement, sortPackagesForDisplay])
 
   const computeSelectedDuration = useCallback(
     (from: Date | null, to: Date | null, perHour: boolean): number | null => {
@@ -1775,46 +1815,9 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
     }
   }
   
-  // Load packages - simplified to prevent infinite loops
+  // Load (and re-load) packages when entitlement changes.
   useEffect(() => {
-    if (!loadedRef.current && !loadingRef.current) {
-      loadingRef.current = true
-      fetch(`/api/packages/post/${postId}`, { credentials: 'include' })
-        .then(res => res.json())
-        .then(data => {
-          
-          // Filter packages inline to avoid dependency issues
-          const filtered = (data.packages || []).filter((pkg: Package) => {
-            if (!pkg.isEnabled) return false
-            
-            // Filter out addon packages - these should only appear on the booking page
-            if (pkg.category === 'addon') return false
-            
-            const pkgEntitlement = (pkg.entitlement || 'standard') as CustomerEntitlement
-
-            if (customerEntitlement === 'none') return pkgEntitlement === 'none'
-            if (customerEntitlement === 'standard') return pkgEntitlement === 'standard'
-            if (customerEntitlement === 'pro') return pkgEntitlement === 'standard' || pkgEntitlement === 'pro'
-            
-            // Legacy: Filter out pro-only packages for non-pro users
-            // Only keep this for packages that don't have entitlement field in database
-            if (pkg.yocoId === 'gathering_monthly' && customerEntitlement !== 'pro') return false
-            
-            return true
-          })
-          
-          
-          
-          // Store original packages for re-filtering
-          originalPackagesRef.current = data.packages || []
-          setPackages(sortPackagesForDisplay(filtered))
-          loadedRef.current = true
-        })
-        .catch(console.error)
-        .finally(() => {
-          loadingRef.current = false
-        })
-    }
+    void fetchPackagesForPost()
   }, [postId, customerEntitlement])
   
   // Auto-scroll is now handled by Conversation component
