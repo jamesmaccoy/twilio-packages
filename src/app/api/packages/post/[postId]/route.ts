@@ -340,12 +340,25 @@ export async function GET(
       })),
     })
 
-    // IMPORTANT: Do not entitlement-filter on the server.
-    // The client (SmartEstimateBlock) has the most accurate subscription context via `/api/check-subscription`
-    // and will filter packages by entitlement consistently.
+    // Entitlement filtering (server-side) to reduce choice and keep API responses aligned
+    // with what the UI should show for the current authenticated user.
+    // Rules:
+    // - none: only entitlement=none
+    // - standard: only entitlement=standard
+    // - pro: entitlement=standard or pro
     const allPackages = combinedPackages
       .filter((pkg: any) => Boolean(pkg?.isEnabled))
       .filter((pkg: any) => String(pkg?.category || '').trim().toLowerCase() !== 'addon')
+      .filter((pkg: any) => {
+        const raw = pkg?.entitlement
+        const pkgEntitlement: CustomerEntitlement =
+          raw === 'none' || raw === 'standard' || raw === 'pro' ? raw : 'standard'
+
+        if (customerEntitlement === 'none') return pkgEntitlement === 'none'
+        if (customerEntitlement === 'standard') return pkgEntitlement === 'standard'
+        if (customerEntitlement === 'pro') return pkgEntitlement === 'standard' || pkgEntitlement === 'pro'
+        return false
+      })
 
     // Debug logging
     console.log('📦 Package filtering summary:', {
