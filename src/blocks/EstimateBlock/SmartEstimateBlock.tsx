@@ -492,6 +492,20 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
     return filtered
   }, [customerEntitlement])
 
+  const sortPackagesForDisplay = useCallback((list: Package[]) => {
+    // Higher priority first: special > hosted > standard
+    const categoryPriority: Record<string, number> = { special: 3, hosted: 2, standard: 1 }
+    return [...list].sort((a, b) => {
+      const aCat = String(a?.category || '').trim().toLowerCase()
+      const bCat = String(b?.category || '').trim().toLowerCase()
+      const aPriority = categoryPriority[aCat] || 0
+      const bPriority = categoryPriority[bCat] || 0
+      if (aPriority !== bPriority) return bPriority - aPriority
+      // Tie-breaker: higher multiplier first
+      return (b.multiplier || 1) - (a.multiplier || 1)
+    })
+  }, [])
+
   const computeSelectedDuration = useCallback(
     (from: Date | null, to: Date | null, perHour: boolean): number | null => {
       if (!from || !to) return null
@@ -1066,9 +1080,9 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
     // Re-filter packages when entitlement changes
     if (originalPackagesRef.current.length > 0) {
       const filtered = filterPackagesByEntitlement(originalPackagesRef.current)
-      setPackages(filtered)
+      setPackages(sortPackagesForDisplay(filtered))
     }
-  }, [subscriptionStatus, filterPackagesByEntitlement])
+  }, [subscriptionStatus, filterPackagesByEntitlement, sortPackagesForDisplay])
 
   // Load Yoco products when initialized
   useEffect(() => {
@@ -1789,7 +1803,7 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
           
           // Store original packages for re-filtering
           originalPackagesRef.current = data.packages || []
-          setPackages(filtered)
+          setPackages(sortPackagesForDisplay(filtered))
           loadedRef.current = true
         })
         .catch(console.error)
