@@ -339,6 +339,9 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
   
   // Ref to store original packages for re-filtering
   const originalPackagesRef = useRef<Package[]>([])
+
+  // Tracks whether the user explicitly chose a package (so we don't override their choice).
+  const userSelectedPackageRef = useRef(false)
   
   // Ref to track last checked dates to prevent duplicate availability checks
   const lastCheckedDatesRef = useRef<{ start: string; end: string } | null>(null)
@@ -1820,7 +1823,15 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
       return
     }
 
+    // If the user manually selected a package, keep it as long as it still exists.
     if (selectedPackage && packages.some((pkg) => pkg.id === selectedPackage.id)) {
+      // If this was an auto-selection and entitlement upgraded, prefer the new top package.
+      if (!userSelectedPackageRef.current) {
+        const top = packages[0]
+        if (top && top.id !== selectedPackage.id) {
+          setSelectedPackage(top)
+        }
+      }
       return
     }
 
@@ -2778,6 +2789,7 @@ ${parsedDates.startDate && parsedDates.endDate ? `\nIMPORTANT: User just request
                 whileHover={{ scale: 1.02 }}
                 className="cursor-pointer bg-white dark:bg-zinc-800 text-slate-950 dark:text-slate-100 shadow-sm border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden hover:shadow-md transition-shadow group mb-4"
                 onClick={() => {
+                  userSelectedPackageRef.current = true
                   setSelectedPackage(pkg)
                   const confirmMessage: Message = {
                     role: 'assistant',
