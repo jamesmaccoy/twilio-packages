@@ -264,7 +264,12 @@ export async function GET(
         // Map revenueCatId to yocoId for backward compatibility
         // If yocoId exists, use it; otherwise fall back to revenueCatId
         const yocoId = (pkg as any).yocoId || pkg.revenueCatId
-        const dbEnabledForPost = isDbPackageEnabledForPost(pkg.id)
+        // `packageSettings` is primarily used to gate *paid* packages.
+        // For free-to-everyone packages (`entitlement: none`), do not hide them just because
+        // a post has packageSettings entries (some posts have legacy settings with enabled=false).
+        const entitlement = (pkg as any).entitlement
+        const dbEnabledForPost =
+          entitlement === 'none' ? true : isDbPackageEnabledForPost(pkg.id)
         const finalEnabled = pkg.isEnabled && dbEnabledForPost
         
         // Debug logging for special packages
