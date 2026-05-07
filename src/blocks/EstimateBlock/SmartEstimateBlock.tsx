@@ -479,8 +479,9 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
       // - entitlement=standard: requires standard or pro
       // - entitlement=pro: requires pro
       if (customerEntitlement === 'none') return pkgEntitlement === 'none'
-      if (customerEntitlement === 'standard') return pkgEntitlement === 'none' || pkgEntitlement === 'standard'
-      if (customerEntitlement === 'pro') return true
+      // For paying users, reduce choice by hiding free (`none`) packages.
+      if (customerEntitlement === 'standard') return pkgEntitlement === 'standard'
+      if (customerEntitlement === 'pro') return pkgEntitlement === 'standard' || pkgEntitlement === 'pro'
       
       // Legacy: Filter out pro-only packages by yocoId for non-pro users
         // Only keep this for packages that don't have entitlement field in database
@@ -1792,8 +1793,8 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
             const pkgEntitlement = (pkg.entitlement || 'standard') as CustomerEntitlement
 
             if (customerEntitlement === 'none') return pkgEntitlement === 'none'
-            if (customerEntitlement === 'standard') return pkgEntitlement === 'none' || pkgEntitlement === 'standard'
-            if (customerEntitlement === 'pro') return true
+            if (customerEntitlement === 'standard') return pkgEntitlement === 'standard'
+            if (customerEntitlement === 'pro') return pkgEntitlement === 'standard' || pkgEntitlement === 'pro'
             
             // Legacy: Filter out pro-only packages for non-pro users
             // Only keep this for packages that don't have entitlement field in database
