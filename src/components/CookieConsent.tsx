@@ -86,16 +86,8 @@ export function CookieConsent() {
           <div className="flex-1">
             <h3 className="text-lg font-semibold mb-2">Cookie Consent</h3>
             <p className="text-sm text-gray-600 mb-4">
-              We use cookies to enhance your browsing experience, analyze site traffic, and personalize content. 
-              By clicking "Accept All", you consent to our use of cookies. You can also choose to accept only 
-              necessary cookies or customize your preferences.
-            </p>
-            <p className="text-xs text-gray-500">
-              <strong>Necessary cookies:</strong> Required for the site to function properly.
-              <br />
-              <strong>Analytics cookies:</strong> Help us understand how visitors interact with our website.
-              <br />
-              <strong>Marketing cookies:</strong> Used to track visitors across websites for marketing purposes (including Meta Pixel).
+              We use cookies to run the site and (optionally) measure and improve it. Choose “Accept All” to allow analytics and
+              marketing cookies, or “Necessary Only” to continue with essential cookies.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Button
@@ -143,7 +135,7 @@ function initializeMetaPixel() {
   }
 
   // Load Meta Pixel script
-  !function(f: any, b: any, e: string, v: string, n: any, t: any, s: any) {
+  ;(function (f: any, b: any, e: string, v: string, n: any, t: any, s: any) {
     if (f.fbq) return
     n = f.fbq = function() {
       n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments)
@@ -158,7 +150,7 @@ function initializeMetaPixel() {
     t.src = v
     s = b.getElementsByTagName(e)[0]
     s.parentNode.insertBefore(t, s)
-  }(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js')
+  })(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js', null, null, null)
 
   // Initialize pixel with error handling
   try {

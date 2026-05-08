@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, CheckCircle2, AlertCircle, Plane, Calendar, Coins, QrCode, Ticket } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { format } from 'date-fns'
@@ -16,6 +16,7 @@ import { ContentPreview } from '@/components/subscribe/ContentPreview'
 import { PricingSection } from '@/components/subscribe/PricingSection'
 import { TransactionFeed, type Transaction } from '@/components/subscribe/TransactionFeed'
 import { NotificationToast } from '@/components/subscribe/NotificationToast'
+import { validateRedirect } from '@/utils/validateRedirect'
 
 type YocoTransaction = {
   id: string
@@ -58,9 +59,11 @@ const periodToDays = (product: YocoProduct) => {
 
 export default function SubscribePage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { currentUser } = useUserContext()
   const { createPaymentLink, isInitialized } = useYoco()
   const subscriptionStatus = useSubscription()
+  const next = validateRedirect(searchParams.get('next')) || '/bookings'
 
   const [products, setProducts] = useState<YocoProduct[]>([])
   const [loadingProducts, setLoadingProducts] = useState(true)
@@ -143,13 +146,13 @@ export default function SubscribePage() {
           console.error('Failed to confirm transaction:', err)
           setError(err instanceof Error ? err.message : 'Failed to confirm payment')
         } finally {
-          router.replace('/subscribe')
+          router.replace(`/subscribe?next=${encodeURIComponent(next)}`)
         }
       }
     }
 
     finalize()
-  }, [fetchTransactions, router])
+  }, [fetchTransactions, next, router])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -273,7 +276,7 @@ export default function SubscribePage() {
           clearInterval(timer)
           setIsRedirecting(true)
           setTimeout(() => {
-            router.push('/bookings')
+            router.push(next)
           }, 800)
           return 0
         }
@@ -282,7 +285,7 @@ export default function SubscribePage() {
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [subscriptionStatus.isSubscribed, router])
+  }, [next, subscriptionStatus.isSubscribed, router])
 
   if (!isInitialized || subscriptionStatus.isLoading) {
     return (
@@ -502,7 +505,7 @@ export default function SubscribePage() {
                 </motion.div>
               </div>
               <h2 className="text-xl font-semibold text-gray-900">
-                Taking you to bookings...
+                Taking you to your account...
               </h2>
             </motion.div>
           )}

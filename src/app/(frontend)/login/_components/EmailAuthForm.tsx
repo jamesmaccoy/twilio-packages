@@ -67,6 +67,11 @@ function OtpInput({ onSubmit, loading }: { onSubmit: (otp: string) => void; load
   )
 }
 
+function buildPostLoginPath(nextPath: string | null | undefined): string {
+  const safeNext = validateRedirect(nextPath) || '/bookings'
+  return `/post-login?next=${encodeURIComponent(safeNext)}`
+}
+
 export default function EmailAuthForm() {
   const [step, setStep] = React.useState<'identifier' | 'password' | 'otp' | 'emailSent'>(
     'identifier',
@@ -178,25 +183,14 @@ export default function EmailAuthForm() {
       const data = await res.json().catch(() => null)
       handleAuthChange()
 
-      const validatedNext = validateRedirect(next)
+      const postLoginPath = buildPostLoginPath(next)
       if (data?.user && data.user.mobileVerified === false) {
-        const mobileOnboardingPath = validatedNext
-          ? `/onboarding/mobile?next=${encodeURIComponent(validatedNext)}`
-          : '/onboarding/mobile?next=%2Fbookings'
+        const mobileOnboardingPath = `/onboarding/mobile?next=${encodeURIComponent(postLoginPath)}`
         router.push(mobileOnboardingPath)
         return
       }
 
-      if (validatedNext) {
-        router.push(validatedNext)
-        return
-      }
-
-      if (!isSubscribed && !isSubscriptionLoading) {
-        router.push('/subscribe')
-      } else {
-        router.push('/bookings')
-      }
+      router.push(postLoginPath)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
@@ -219,15 +213,13 @@ export default function EmailAuthForm() {
       // Optionally: handleAuthChange()
       // Optionally: validateRedirect
       handleAuthChange()
-      const validatedNext = validateRedirect(next)
+      const postLoginPath = buildPostLoginPath(next)
       if (data?.mobileVerified === false) {
-        const mobileOnboardingPath = validatedNext
-          ? `/onboarding/mobile?next=${encodeURIComponent(validatedNext)}`
-          : '/onboarding/mobile?next=%2Fbookings'
+        const mobileOnboardingPath = `/onboarding/mobile?next=${encodeURIComponent(postLoginPath)}`
         router.push(mobileOnboardingPath)
         return
       }
-      router.push(validatedNext || '/bookings')
+      router.push(postLoginPath)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Invalid OTP')
     } finally {
@@ -246,8 +238,8 @@ export default function EmailAuthForm() {
             type="button"
             className="w-full h-10"
             onClick={() => {
-              const validatedNext = validateRedirect(next)
-              const redirect = validatedNext ? `?next=${encodeURIComponent(validatedNext)}` : ''
+              const redirectTarget = buildPostLoginPath(next)
+              const redirect = `?next=${encodeURIComponent(redirectTarget)}`
               window.location.href = `/api/auth/google${redirect}`
             }}
           >

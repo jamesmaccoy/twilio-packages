@@ -2732,11 +2732,14 @@ ${parsedDates.startDate && parsedDates.endDate ? `\nIMPORTANT: User just request
       }
       appendMessageToThread(threadId, assistantMessage)
       speakSafely(data.message)
-      
-      if (
+
+      if (data.showPackages === true) {
+        setTimeout(() => showAvailablePackages(threadId), 300)
+      } else if (
         typeof data.message === 'string' &&
         (data.message.toLowerCase().includes('package') || data.message.toLowerCase().includes('option'))
       ) {
+        // Back-compat fallback for older API responses
         setTimeout(() => showAvailablePackages(threadId), 1000)
       }
       

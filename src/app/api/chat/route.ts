@@ -1304,7 +1304,21 @@ Be helpful, concise, and guide users to make great booking decisions.`
     const text = response.text()
     const usage = serializeUsageMetadata(response.usageMetadata)
 
-    return NextResponse.json({ message: text, usage })
+    // Hint to the client when it's appropriate to render package cards.
+    // The SmartEstimateBlock UI needs an explicit trigger; relying on keyword matching is brittle.
+    const lowerUserMessage = messageText.toLowerCase()
+    const lowerAssistantText = text.toLowerCase()
+    const showPackages =
+      lowerUserMessage.includes('package') ||
+      lowerUserMessage.includes('packages') ||
+      lowerUserMessage.includes('option') ||
+      lowerUserMessage.includes('options') ||
+      lowerUserMessage.includes('recommend') ||
+      lowerUserMessage.includes('suggest') ||
+      lowerAssistantText.includes('package') ||
+      lowerAssistantText.includes('packages')
+
+    return NextResponse.json({ message: text, usage, showPackages })
   } catch (error) {
     console.error('Error in chat API:', error)
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
