@@ -16,6 +16,7 @@ import Script from 'next/script'
 import { CookieConsent } from '@/components/CookieConsent'
 import { GoogleAdsTracking } from '@/components/GoogleAdsTracking'
 import { Suspense } from 'react'
+import { MetaPixelPageView } from '@/components/MetaAds/MetaPixelPageView'
 
 import './globals.css'
 import { getServerSideURL } from '@/utilities/getURL'
@@ -119,6 +120,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <CookieConsent />
           <Suspense fallback={null}>
             <GoogleAdsTracking />
+          </Suspense>
+          <Suspense fallback={null}>
+            <MetaPixelPageView />
           </Suspense>
         </Providers>
       </body>
