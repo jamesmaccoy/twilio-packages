@@ -18,6 +18,14 @@ import { Button } from '@/components/ui/button'
 export const HeaderNav: React.FC<{ data: HeaderType }> = ({ data }) => {
   const navItems = data?.navItems || []
 
+  const hasBookingsInCmsNav = navItems.some((item) => {
+    const link = item.link
+    const url = link?.type === 'custom' ? link?.url : null
+    if (typeof url !== 'string' || !url.trim()) return false
+    const path = (url.trim().split('?')[0] ?? '').replace(/\/$/, '') || '/'
+    return path === '/bookings'
+  })
+
   const { currentUser, actorUser, isPreview, previewEmail, handleAuthChange } = useUserContext()
   const subscriptionStatus = useSubscription()
   const customerEntitlement = getCustomerEntitlement(subscriptionStatus)
@@ -26,13 +34,12 @@ export const HeaderNav: React.FC<{ data: HeaderType }> = ({ data }) => {
   const roleArray = Array.isArray(roleValue) ? roleValue : roleValue ? [roleValue] : []
   const isAdminOrHost = roleArray.includes('admin') || roleArray.includes('host')
 
-  // Pro customers should see Manage even if the subscription hook hasn't resolved yet.
   const userPlan = (currentUser as any)?.subscriptionStatus?.plan as string | undefined
-  const hasPaidPlan = userPlan === 'basic' || userPlan === 'pro' || userPlan === 'enterprise'
+  const hasProSubscription =
+    userPlan === 'pro' || customerEntitlement === 'pro'
 
-  // Check if user has standard/pro entitlement, paid plan, or is admin/host
-  const canManagePlek =
-    isAdminOrHost || customerEntitlement === 'standard' || customerEntitlement === 'pro' || hasPaidPlan
+  // Hosts/admins manage listings; customers only see Manage with Pro (subscription or entitlement).
+  const canShowManageLink = isAdminOrHost || hasProSubscription
 
   const stopPreview = async () => {
     try {
@@ -73,8 +80,13 @@ export const HeaderNav: React.FC<{ data: HeaderType }> = ({ data }) => {
         return <CMSLink key={i} {...link} appearance="link" />
       })}
       
-      {/* Add Management link for standard/pro subscribers and admins */}
-      {canManagePlek && (
+      {currentUser && !hasBookingsInCmsNav ? (
+        <Link href="/bookings" className={buttonVariants({ variant: 'link' })}>
+          Bookings
+        </Link>
+      ) : null}
+
+      {canShowManageLink && (
         <Link 
           href="/manage" 
           className={buttonVariants({ variant: "link" })}

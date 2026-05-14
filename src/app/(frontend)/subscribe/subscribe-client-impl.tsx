@@ -26,7 +26,7 @@ type YocoTransaction = {
   amount?: number
   currency?: string
   entitlement?: 'none' | 'standard' | 'pro'
-  plan?: 'free' | 'standard' | 'pro'
+  plan?: 'free' | 'standard' | 'pro' | 'basic'
   createdAt?: string
   completedAt?: string
   expiresAt?: string
@@ -189,7 +189,12 @@ export default function SubscribeClientImpl() {
     }
   }, [])
 
-  const standardProduct = useMemo(() => products.find((product) => product.entitlement !== 'pro'), [products])
+  const standardProduct = useMemo(
+    () =>
+      products.find((product) => product.entitlement === 'standard') ||
+      products.find((product) => product.entitlement && product.entitlement !== 'pro'),
+    [products],
+  )
 
   const proProduct = useMemo(() => products.find((product) => product.entitlement === 'pro'), [products])
 
