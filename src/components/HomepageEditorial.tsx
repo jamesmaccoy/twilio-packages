@@ -177,16 +177,17 @@ export function HomepageEditorial({ featuredPosts = [] }: HomepageEditorialProps
   const [packagesLoading, setPackagesLoading] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
-    // Prefetch packages for currently visible posts so the "ideal package" feels instant.
+    // Load packages once per visible post. Stay length only affects which package we highlight
+    // (`selectBestPackage` uses `nights`); the package list for a post does not depend on dates.
     const visible = filteredPosts.slice(0, 12)
     for (const post of visible) {
       const postId = String((post as any)?.id || '')
       if (!postId) continue
-      if (packagesByPostId[postId] || packagesLoading[postId]) continue
+      if (Object.prototype.hasOwnProperty.call(packagesByPostId, postId) || packagesLoading[postId]) continue
 
       setPackagesLoading((prev) => ({ ...prev, [postId]: true }))
 
-      fetch(`/api/packages/post/${postId}`, { credentials: 'include' })
+      fetch(`/api/packages/post/${postId}?context=editorial`, { credentials: 'include' })
         .then(async (res) => {
           if (!res.ok) return { packages: [] as PackageListItem[] }
           return (await res.json()) as { packages?: PackageListItem[] }
@@ -197,6 +198,7 @@ export function HomepageEditorial({ featuredPosts = [] }: HomepageEditorialProps
         })
         .catch((err) => {
           console.warn('Failed to load packages for post', postId, err)
+          setPackagesByPostId((prev) => ({ ...prev, [postId]: [] }))
         })
         .finally(() => {
           setPackagesLoading((prev) => ({ ...prev, [postId]: false }))
@@ -327,12 +329,9 @@ export function HomepageEditorial({ featuredPosts = [] }: HomepageEditorialProps
 
               const postId = String((post as any)?.id || '')
               const pkgs = postId ? packagesByPostId[postId] || [] : []
+              const packagesLoaded = Boolean(postId && Object.prototype.hasOwnProperty.call(packagesByPostId, postId))
+              const rowLoading = Boolean(postId && packagesLoading[postId])
               const best = selectBestPackage(pkgs, nights)
-
-              const href =
-                slug && typeof slug === 'string'
-                  ? `/posts/${encodeURIComponent(slug)}?fromDate=${encodeURIComponent(fromDate)}&toDate=${encodeURIComponent(toDate)}`
-                  : `/posts/${slug}`
 
               const formatZar = (rands: number) => {
                 try {
@@ -346,6 +345,27 @@ export function HomepageEditorial({ featuredPosts = [] }: HomepageEditorialProps
                 }
               }
 
+              let packageLabel: string | undefined
+              let packageMeta: string | undefined
+              if (nights <= 0) {
+                packageLabel = undefined
+                packageMeta = undefined
+              } else if (!packagesLoaded || rowLoading) {
+                packageLabel = 'Loading packages…'
+                packageMeta = undefined
+              } else if (best) {
+                packageLabel = best.name
+                packageMeta = `${typeof best.baseRate === 'number' ? `${formatZar(best.baseRate)} • ` : ''}${best.minNights}-${best.maxNights} nights`
+              } else {
+                packageLabel = undefined
+                packageMeta = undefined
+              }
+
+              const href =
+                slug && typeof slug === 'string'
+                  ? `/posts/${encodeURIComponent(slug)}?fromDate=${encodeURIComponent(fromDate)}&toDate=${encodeURIComponent(toDate)}`
+                  : `/posts/${slug}`
+
               return (
                 <LuxuryCard
                   key={slug || postId || index}
@@ -357,12 +377,8 @@ export function HomepageEditorial({ featuredPosts = [] }: HomepageEditorialProps
                   href={href}
                   delay={index * 0.08}
                   layoutId={slug || undefined}
-                  packageLabel={best ? best.name : nights > 0 ? 'Loading ideal package…' : undefined}
-                  packageMeta={
-                    best
-                      ? `${typeof best.baseRate === 'number' ? `${formatZar(best.baseRate)} • ` : ''}${best.minNights}-${best.maxNights} nights`
-                      : undefined
-                  }
+                  packageLabel={packageLabel}
+                  packageMeta={packageMeta}
                 />
               )
             })}

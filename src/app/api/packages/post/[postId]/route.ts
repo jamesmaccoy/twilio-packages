@@ -62,6 +62,8 @@ export async function GET(
   try {
     const payload = await getPayload({ config: configPromise })
     const { postId } = await params
+    const context = request.nextUrl.searchParams.get('context')
+    const isEditorialPreview = context === 'editorial'
     
     // Get user and determine entitlement
     const user = await getAuthedUser(payload, request)
@@ -358,6 +360,11 @@ export async function GET(
         const raw = pkg?.entitlement
         const pkgEntitlement: CustomerEntitlement =
           raw === 'none' || raw === 'standard' || raw === 'pro' ? raw : 'standard'
+
+        // Home editorial grid: show bookable tiers for browsing (not pro-only upsells).
+        if (isEditorialPreview) {
+          return pkgEntitlement === 'none' || pkgEntitlement === 'standard'
+        }
 
         if (customerEntitlement === 'none') return pkgEntitlement === 'none'
         if (customerEntitlement === 'standard') return pkgEntitlement === 'standard'

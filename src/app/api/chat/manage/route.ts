@@ -13,7 +13,7 @@ const packagePreviewSchema = z.object({
   name: z.string(),
   description: z.string(),
   category: z.enum(['standard', 'hosted', 'addon', 'special']),
-  entitlement: z.enum(['standard', 'pro']),
+  entitlement: z.enum(['none', 'standard', 'pro']),
   minNights: z.number().int().min(1),
   maxNights: z.number().int().min(1),
   baseRate: z.number().int().min(0),
@@ -37,7 +37,7 @@ const createdPackageSchema = z.object({
     maxNights: z.number(),
     baseRate: z.number().nullable().optional(),
     multiplier: z.number(),
-    entitlement: z.enum(['standard', 'pro']),
+    entitlement: z.enum(['none', 'standard', 'pro']),
     features: z.any(),
     postId: z.string().optional(),
   }),
@@ -74,6 +74,40 @@ const catalogSuggestionSchema = z.object({
     .min(1)
     .max(4),
 })
+
+/** Shown after createPost and before catalog/preview tools on new listings */
+export const PACKAGE_PLACEMENT_QUESTIONS = `Before I suggest packages, a few quick questions so guests see the right offers:
+
+1. **Repeat add-on or stay package?** — Extras like cleaning or tours are usually **add-on** (one-off). Nightly or weekly stays are **standard** or **special**.
+2. **Offer a deal to guests without a subscription?** — Yes → often **special** with **non-member** visibility. Member-only deals stay on **standard** entitlement.
+3. **Hosted experience?** — Yes → **hosted** (you or staff involved during the stay).
+
+Reply in your own words (e.g. "weekly stay, special for non-members, not hosted") and I'll match packages.`
+
+function applyPlacementOverrides(
+  recommendations: z.infer<typeof catalogSuggestionSchema>['recommendations'],
+  hint?: string,
+) {
+  if (!hint?.trim()) return recommendations
+  const h = hint.toLowerCase()
+  const wantsNonMember =
+    /non-?member|without (a )?subscription|guests without|unsubscribed|not subscribed|public (offer|deal)|anyone can (book|see)/.test(
+      h,
+    )
+  const wantsHosted = /\bhosted\b|concierge|host (will |is )?involv|personalized service/.test(h)
+  const wantsAddon =
+    /\baddon\b|add-?on|once[- ]?off|one[- ]?time|cleaning|tour|extra service|not (a )?stay|repeat service/.test(h)
+  const wantsSpecial = /\bspecial\b|promo|promotion|limited[- ]?time|deal for/.test(h)
+
+  return recommendations.map((r) => {
+    const details = { ...(r as any).details } as Record<string, unknown>
+    if (wantsNonMember) details.customerTierRequired = 'none'
+    if (wantsHosted) details.category = 'hosted'
+    if (wantsAddon) details.category = 'addon'
+    if (wantsSpecial && wantsNonMember) details.category = 'special'
+    return { ...r, details }
+  })
+}
 
 function fallbackCatalogBaseRateRands(category: string, minNights: number) {
   const c = String(category || 'standard')
@@ -119,6 +153,7 @@ async function runCatalogPackageSuggestions(
       revenueCatId: t.revenueCatId,
       defaultName: getDefaultPackageTitle(t),
       category: t.category,
+      customerTierRequired: t.customerTierRequired,
       minNights: t.minNights,
       maxNights: t.maxNights,
       features: t.features.map((f) => f.label).join(', '),
@@ -133,15 +168,21 @@ async function runCatalogPackageSuggestions(
       prompt: `Pick packages from this catalog only (use exact revenueCatId values).
 
 Catalog:
-${knownTemplates.map((t) => `- ${t.revenueCatId}: ${t.defaultName} [${t.category}, ${t.minNights}-${t.maxNights} nights, features: ${t.features}]`).join('\n')}
+${knownTemplates.map((t) => `- ${t.revenueCatId}: ${t.defaultName} [${t.category}, tier: ${t.customerTierRequired}, ${t.minNights}-${t.maxNights} nights, features: ${t.features}]`).join('\n')}
 
 Property title: "${title || 'Untitled'}"
 Property base rate (ZAR per night): "${typeof postBaseRate === 'number' ? postBaseRate : 'N/A'}"
 Property meta description: "${metaDesc || 'N/A'}"
 Property body (first paragraph): "${body || 'N/A'}"
-User hint: "${hint || 'N/A'}"
+User hint / host placement answers: "${hint || 'N/A'}"
 
 Return 1–4 recommendations. suggestedName/description/features must be specific to this property, not generic.
+
+Host placement (use hint when present):
+- Add-on / once-off / cleaning / tours → prefer **addon** catalog rows
+- Hosted / concierge → prefer **hosted** rows
+- Special for non-members / guests without subscription → prefer **special** or tier **none** rows
+- Member-only stays → tier **standard** or **pro** as appropriate
 
 IMPORTANT: Include a baseRate for each recommendation as a whole-number ZAR amount (e.g. 650). Use the property's base rate as a reference if provided, and adjust for tier:
 - hosted: higher than standard
@@ -153,7 +194,7 @@ IMPORTANT: Include a baseRate for each recommendation as a whole-number ZAR amou
     const picked = filtered.length ? filtered : result.object.recommendations
     // Catalog rows do not include min/max in the LLM schema — attach template nights so
     // "Approve all" persists the same durations as the catalog (incl. 0.5-night hourly).
-    const recommendations = picked.map((r) => {
+    const mapped = picked.map((r) => {
       const tpl = BASE_PACKAGE_TEMPLATES.find((t) => t.revenueCatId === r.revenueCatId)
       const tplCategory = String(tpl?.category || 'standard')
       const tplMin = typeof tpl?.minNights === 'number' ? tpl.minNights : 1
@@ -189,6 +230,7 @@ IMPORTANT: Include a baseRate for each recommendation as a whole-number ZAR amou
         },
       }
     })
+    const recommendations = applyPlacementOverrides(mapped, hint)
     return {
       success: true,
       postId: pid,
@@ -356,12 +398,18 @@ export async function POST(request: NextRequest) {
     // Create a tool for previewing package creation
     // @ts-ignore - AI SDK tool type inference issue
     const previewPackageTool = tool({
-      description: '🚨 MANDATORY FIRST STEP: Preview a package before creating it. Shows a mock package card with all details filled in based on the user\'s request. ALWAYS guess missing values (baseRate, features, nights, etc.) so the preview is complete. CRITICAL: When user says "create", "make", "new package", mentions a price like "R300", or wants to create a package, you MUST call this tool IMMEDIATELY without ANY text response first. DO NOT ask questions. DO NOT explain. Just call this tool with intelligent guesses based on user input. If user provides ANY package details (name, price, description), extract them and call this tool immediately.',
+      description:
+        'Preview a package before creating it. Shows a mock package card with all details. For NEW listings, ask package placement questions first (see system prompt) unless the user already answered. When the user gives package details (name, price, category intent), call immediately with category and entitlement from their answers: addon = repeat/once-off extras, hosted = hosted stay, special + entitlement none = non-member deals, standard = member stays. Guess missing baseRate/features/nights from category defaults.',
       parameters: z.object({
         name: z.string().optional().describe('Package display name (include emoji if appropriate). If not provided, generate based on category and description.'),
         description: z.string().optional().describe('Detailed description of what the package offers. If not provided, generate based on category.'),
         category: z.enum(['standard', 'hosted', 'addon', 'special']).optional().describe('Package category. If not specified, infer from description or default to "standard".'),
-        entitlement: z.enum(['standard', 'pro']).default('standard').describe('Required customer entitlement level'),
+        entitlement: z
+          .enum(['none', 'standard', 'pro'])
+          .default('standard')
+          .describe(
+            'Who can see/book: none = guests without subscription, standard = members, pro = pro members only',
+          ),
         minNights: z.number().int().min(1).optional().describe('Minimum number of nights. If not provided, will be guessed based on category.'),
         maxNights: z.number().int().min(1).optional().describe('Maximum number of nights. If not provided, will be guessed based on category.'),
         baseRate: z.number().min(0).optional().describe('Base rate in whole Rands (ZAR). Example: 300 means R300.'),
@@ -457,7 +505,10 @@ export async function POST(request: NextRequest) {
         name: z.string().describe('Package name'),
         description: z.string().describe('Package description'),
         category: z.enum(['standard', 'hosted', 'addon', 'special']).describe('Package category'),
-        entitlement: z.enum(['standard', 'pro']).default('standard').describe('Required customer entitlement'),
+        entitlement: z
+          .enum(['none', 'standard', 'pro'])
+          .default('standard')
+          .describe('Who can see/book: none = non-subscribers, standard = members, pro = pro only'),
         minNights: z.number().min(0.5).describe('Minimum nights (can be 0.5 for half-day packages)'),
         maxNights: z.number().min(0.5).describe('Maximum nights'),
         baseRate: z.number().min(0).optional().describe('Base rate in whole Rands (ZAR). Example: 300 means R300.'),
@@ -709,7 +760,7 @@ export async function POST(request: NextRequest) {
         name: z.string().optional(),
         description: z.string().optional(),
         category: z.enum(['standard', 'hosted', 'addon', 'special']).optional(),
-        entitlement: z.enum(['standard', 'pro']).optional(),
+        entitlement: z.enum(['none', 'standard', 'pro']).optional(),
         minNights: z.number().int().min(1).optional(),
         maxNights: z.number().int().min(1).optional(),
         baseRate: z.number().int().min(0).optional(),
@@ -841,7 +892,7 @@ export async function POST(request: NextRequest) {
     // @ts-ignore - AI SDK tool type inference issue
     const createPostTool = tool({
       description:
-        'Create a new property (post) for the host. After success, catalog package ideas are generated from the listing copy (recommendations in the tool output). Use those in your reply and move straight to previewPackage or ask which package to build first.',
+        'Create a new property (post) for the host. Does NOT auto-suggest packages. After success, ask the package placement questions in text, then call suggestCatalogPackages or previewPackage once the host answers.',
       parameters: z.object({
         title: z.string().describe('Property title/name (e.g., "Beachfront Studio", "Mountain Cabin")'),
         description: z.string().optional().describe('Property description. If not provided, will generate based on title.'),
@@ -923,20 +974,7 @@ export async function POST(request: NextRequest) {
 
           console.log('Post created successfully:', created.id)
 
-          const hint = `${title}\n${postDescription}`.slice(0, 2000)
-          let hasRecs = false
-          let recommendations: z.infer<typeof catalogSuggestionSchema>['recommendations'] = []
-          try {
-            const catalog = await runCatalogPackageSuggestions(payload, user, String(created.id), hint)
-            hasRecs = catalog.success && catalog.recommendations.length > 0
-            recommendations = hasRecs ? catalog.recommendations : []
-          } catch (catalogErr) {
-            console.error('Catalog suggestions after createPost (non-fatal):', catalogErr)
-          }
-
-          const message = hasRecs
-            ? `"${title}" is saved as a draft. Below are starter packages matched to this listing — say which one to preview first, or describe the stay or add-on you want to sell next.`
-            : `"${title}" is saved as a draft. What kinds of packages would you like? (For example: nightly stay, weekly deal, cleaning or experience add-ons — I can draft a preview.)`
+          const message = `"${title}" is saved as a draft.\n\n${PACKAGE_PLACEMENT_QUESTIONS}`
 
           return {
             success: true,
@@ -947,7 +985,7 @@ export async function POST(request: NextRequest) {
               baseRate: created.baseRate,
               status: created._status,
             },
-            recommendations,
+            recommendations: [],
             message,
           }
         } catch (error: any) {
@@ -964,10 +1002,15 @@ export async function POST(request: NextRequest) {
     // @ts-ignore - AI SDK tool type inference issue
     const suggestCatalogPackagesForPostTool = tool({
       description:
-        'Suggest 1–4 packages from the fixed catalog (revenueCatId) for a property, using listing title, description, and optional user hint. Use when the user wants fresh ideas; createPostTool already runs this once after a new listing.',
+        'Suggest 1–4 packages from the fixed catalog for a property. Call ONLY after package placement questions are answered (add-on vs stay, non-member specials, hosted) — pass those answers in hint. Use when the user wants starter ideas or after a new listing + placement Q&A.',
       parameters: z.object({
         postId: z.string().describe('Property (post) ID'),
-        hint: z.string().optional().describe('Extra context from the user message'),
+        hint: z
+          .string()
+          .optional()
+          .describe(
+            'Host placement answers: add-on vs stay, non-member/special, hosted — plus any property context',
+          ),
       }),
       // @ts-expect-error - AI SDK type inference issue
       execute: async ({ postId: pid, hint }: any) => {
@@ -1010,37 +1053,34 @@ export async function POST(request: NextRequest) {
     const systemPrompt = `You are an AI assistant helping a host manage their properties and packages.
 
 🏠 NEW LISTING / PROPERTY FIRST (overrides generic “jump straight to package preview”):
-- If the user wants a **new** property/listing/post (e.g. add/list/register a place, “I have a cottage…”, “new Airbnb”, “create a listing”), call **createPostTool** first:
-  - **title** = a short headline you extract from their message (required).
-  - **description** = their full message or a faithful summary (body text for the draft).
-- **createPostTool** already generates **recommendations** (catalog ideas) from that listing. Do **not** stop at “listing created” — in the same assistant turn when possible:
-  - Summarize the ideas briefly and **ask which package they want to preview or save first**, **or**
-  - If they already described a package (weekend stay, weekly rate, add-on, price), **immediately** call **previewPackageTool** with **postId** = the new **post.id** and copy aligned to the property (not generic “Standard Package”).
-- Call **suggestCatalogPackages** only if they want **different** ideas than what **createPostTool** returned.
+- If the user wants a **new** property/listing/post, call **createPostTool** first (title + description from their message).
+- **createPostTool** does NOT return package ideas. After it succeeds, reply with the **package placement questions** (add-on vs stay, non-member special, hosted) — do NOT call suggestCatalogPackages or previewPackage until they answer.
+- When they answer, call **suggestCatalogPackages** with **postId** = new post.id and **hint** = their placement answers, OR **previewPackageTool** if they named a specific package/price.
 - Only skip createPostTool if they are clearly working with an **existing** listing already in context.
 
+📋 PACKAGE PLACEMENT (ask before first catalog/preview on a listing):
+Ask these unless the user already answered in the same thread:
+1. **Repeat add-on or stay package?** → add-on category for cleaning/tours/extras; standard/special for stays.
+2. **Offer a deal to guests without a subscription?** → special category + entitlement **none** for non-members; standard entitlement for members only.
+3. **Hosted experience?** → hosted category when host/staff is involved.
+
+Map answers into **category** and **entitlement** on previewPackageTool and into **hint** for suggestCatalogPackages.
+
 📦 STARTER PACKAGE IDEAS (existing listing):
-- If the user asks to "Generate packages", "starter package ideas", or wants ideas for an **existing** property AND a postId is available in context (pageData.postId or explicitly in the message),
-  IMMEDIATELY call **suggestCatalogPackages** (NOT previewPackageTool) to return 1–4 catalog-based recommendations.
-- After suggestions are shown, the UI will offer "Approve all" to save them; do not create any packages unless the user approves.
+- If the user asks to "Generate packages" or starter ideas for an **existing** property with postId: if placement is unknown, ask the three questions first; then call **suggestCatalogPackages** with postId + hint (their answers).
+- After suggestions are shown, the UI offers "Approve all"; do not create packages unless the user approves.
 
-🚨 CRITICAL TOOL CALLING RULES - FOLLOW THESE EXACTLY:
-1. When a user says "CALL previewPackageTool NOW" or asks to create a package (ANY variation: "create", "make", "new package", mentions price like "R300", "package for R500", "make a package called X"), you MUST IMMEDIATELY call previewPackageTool WITHOUT any text response first — **unless** the message is primarily about creating a **new property/listing** (then follow NEW LISTING FIRST above).
-1b. When a user says "CALL suggestCatalogPackages NOW" (or "Generate packages") for an existing listing and provides a postId, you MUST IMMEDIATELY call suggestCatalogPackages with that postId — NO TEXT FIRST.
-2. DO NOT ask clarifying questions - use the tool with intelligent guesses based on the user's input
-3. DO NOT respond with text explaining what you'll do - just call the tool IMMEDIATELY
-4. DO NOT say "I'll create..." or "Let me..." - just call previewPackageTool right away
-5. DO NOT generate any text before calling the tool - the tool call must be your FIRST action
-6. After previewPackageTool completes, THEN provide a brief text response explaining the preview
+🚨 TOOL CALLING RULES:
+1. **New listing flow**: createPost → placement questions (text) → suggestCatalogPackages or previewPackage after answers.
+2. When the user says "CALL previewPackageTool NOW" or gives explicit package details (name, price, category), call **previewPackageTool** immediately with **category** and **entitlement** from placement answers — **unless** you still need placement Q&A for a brand-new listing with no answers yet.
+2b. When the user says "CALL suggestCatalogPackages NOW" with postId: call suggestCatalogPackages only if placement is known or included in the message; otherwise ask placement questions first.
+3. For vague "create a package" with no placement context on a **new** listing, ask placement questions before tools.
+4. After previewPackageTool completes, provide a brief text response explaining the preview.
 
-EXAMPLES OF IMMEDIATE TOOL CALLS (NO TEXT BEFORE TOOL):
-- User: "CALL previewPackageTool NOW with name=X, description=Y" → IMMEDIATELY call previewPackageTool(name="X", description="Y") - NO TEXT FIRST
-- User: "make a package for R300 called vudu" → IMMEDIATELY call previewPackageTool(name="vudu", baseRate=30000) - NO TEXT FIRST
-- User: "create a weekend getaway package" → IMMEDIATELY call previewPackageTool with reasonable defaults - NO TEXT FIRST  
-- User: "new package for R500" → IMMEDIATELY call previewPackageTool(baseRate=50000) - NO TEXT FIRST
-- User: "package that creates packages" → IMMEDIATELY call previewPackageTool - NO TEXT FIRST
-- User: "create package" → IMMEDIATELY call previewPackageTool - NO TEXT FIRST
-- User: "I want to create a package" → IMMEDIATELY call previewPackageTool - NO TEXT FIRST
+EXAMPLES:
+- User drafts new plek → createPost → ask placement questions (text only).
+- User: "weekly stay, special for non-members, not hosted" → suggestCatalogPackages(postId, hint=their answer) OR previewPackage(category=special, entitlement=none).
+- User: "CALL previewPackageTool NOW with name=X, category=hosted, entitlement=standard" → previewPackage immediately.
 
 AFTER TOOL CALLS:
 - When user confirms (says "yes", "create", "confirm", "create it", "that looks good"), IMMEDIATELY call createPackageTool with the exact values from the preview - NO TEXT FIRST
@@ -1065,10 +1105,8 @@ ${specialPackages.length > 0
 PROPERTY & PACKAGE MANAGEMENT GUIDELINES:
 
 PROPERTY CREATION:
-1. When user wants to create a property from a package they offer:
-   - FIRST use createPostTool to create the property (post)
-   - THEN use previewPackageTool to show them the package preview
-   - FINALLY use createPackageTool to create and assign the package to the new property
+1. When user wants a new listing:
+   - createPostTool → package placement questions → suggestCatalogPackages or previewPackage → createPackageTool after they confirm a preview
 2. If user wants to create a package but doesn't specify a property:
    - Prefer the listing selected in Manage (sidebar). If none is selected, createPackageTool will create a draft property automatically and attach the package.
    - Hosts can also use createPostTool explicitly if they want to name/configure a listing before packages.
@@ -1080,11 +1118,13 @@ PACKAGE MANAGEMENT:
    - hosted: Packages with concierge services and premium amenities
    - addon: One-time extras like cleaning, wine, guided tours (not accommodation)
    - special: Promotional/unique packages - these are VERY POPULAR with customers! Consider creating special packages for seasonal promotions, unique experiences, or limited-time offers
-3. Entitlements: standard (all customers), pro (premium customers only)
-4. When user wants to create a package (e.g., "create a package", "make a package", "new package", "package for R300"):
-   - IMMEDIATELY call previewPackageTool - DO NOT respond with text first
-   - Extract package name and price in Rands (e.g., R300), and any other details from the request
-   - Fill in ALL missing values with reasonable guesses based on category defaults
+3. Entitlements:
+   - **none**: visible to guests without a subscription (non-members)
+   - **standard**: subscription members (standard and pro plans)
+   - **pro**: pro subscribers only
+4. When user wants to create a package with enough detail (name, price, or category intent):
+   - Use previewPackageTool with category and entitlement from placement answers
+   - Extract price in Rands (e.g., R300 → baseRate 300) and fill missing fields from category defaults
    - The preview should show complete package details including guessed baseRate, features, nights, etc.
    - Wait for user confirmation
    - THEN use createPackageTool to actually create it

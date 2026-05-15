@@ -18,7 +18,8 @@ type Suggestion = {
     maxNights?: number
     multiplier?: number
     category?: 'standard' | 'hosted' | 'addon' | 'special' | string
-    customerTierRequired?: 'standard' | 'pro' | string
+    customerTierRequired?: 'none' | 'standard' | 'pro' | string
+    entitlement?: 'none' | 'standard' | 'pro' | string
     features?: string
   }
 }
@@ -48,8 +49,15 @@ function resolveSuggestionFields(s: Suggestion) {
   const multiplierRaw = parseFiniteNumber(d.multiplier ?? tpl?.baseMultiplier, 1)
   const multiplier = Number.isFinite(multiplierRaw) ? Math.min(3, Math.max(0.1, multiplierRaw)) : 1
 
-  const tierRaw = String(d.customerTierRequired || tpl?.customerTierRequired || 'standard').toLowerCase()
-  const entitlement = tierRaw.includes('pro') ? ('pro' as const) : ('standard' as const)
+  const tierRaw = String(
+    d.entitlement || d.customerTierRequired || tpl?.customerTierRequired || 'standard',
+  ).toLowerCase()
+  const entitlement =
+    tierRaw === 'none' || tierRaw.includes('non-member') || tierRaw.includes('public')
+      ? ('none' as const)
+      : tierRaw.includes('pro')
+        ? ('pro' as const)
+        : ('standard' as const)
 
   return { minNights, maxNights, category, multiplier, entitlement }
 }

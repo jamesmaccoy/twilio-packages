@@ -25,7 +25,35 @@ const MANAGE_NEW_LISTING_PROMPT = `Create a new listing for my property.
 Title: My guest stay (edit this title)
 Description: Brief guest-facing summary — space, location, amenities, and who it is for. (edit this paragraph)
 
-Now suggest a few packages for this listing.`
+Save the listing as a draft only. After it is created, ask me the package placement questions (add-on vs stay, non-member specials, hosted) before suggesting any packages.`
+
+function catalogRecPlacementLabel(r: {
+  details?: { category?: string; customerTierRequired?: string }
+}): string {
+  const cat = r.details?.category || 'standard'
+  const tier = String(r.details?.customerTierRequired || 'standard').toLowerCase()
+  const audience =
+    tier === 'none' ? 'Non-members' : tier === 'pro' ? 'Pro members' : 'Members'
+  return `${cat} · ${audience}`
+}
+
+function renderCatalogRecMeta(r: {
+  revenueCatId?: string
+  details?: { minNights?: number; maxNights?: number; category?: string; customerTierRequired?: string }
+}) {
+  return (
+    <>
+      <div className="text-xs text-slate-500 font-mono mt-0.5">{r.revenueCatId}</div>
+      <p className="text-xs text-teal-800/90 mt-1 font-medium">{catalogRecPlacementLabel(r)}</p>
+      {r.details &&
+      (typeof r.details.minNights === 'number' || typeof r.details.maxNights === 'number') ? (
+        <p className="text-xs text-slate-500 mt-1">
+          Duration: {r.details.minNights}–{r.details.maxNights} nights
+        </p>
+      ) : null}
+    </>
+  )
+}
 
 interface PageAIAssistantProps {
   context?: {
@@ -990,6 +1018,7 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
                       }
                     }
 
+
                     if (toolName === 'suggestCatalogPackages') {
                       switch (part.state) {
                         case 'input-available':
@@ -1059,16 +1088,7 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
                                           </Button>
                                         ) : null}
                                       </div>
-                                      <div className="text-xs text-slate-500 font-mono mt-0.5">
-                                        {r.revenueCatId}
-                                      </div>
-                                      {r.details &&
-                                      (typeof r.details.minNights === 'number' ||
-                                        typeof r.details.maxNights === 'number') ? (
-                                        <p className="text-xs text-slate-500 mt-1">
-                                          Duration: {r.details.minNights}–{r.details.maxNights} nights
-                                        </p>
-                                      ) : null}
+                                      {renderCatalogRecMeta(r)}
                                       <p className="text-xs text-slate-600 mt-2">{r.description}</p>
                                     </li>
                                   ))}
@@ -1152,16 +1172,7 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
                                   {recs.map((r: any, i: number) => (
                                     <li key={i} className="rounded-md border bg-white p-3 shadow-sm">
                                       <div className="font-semibold text-slate-900">{r.suggestedName}</div>
-                                      <div className="text-xs text-slate-500 font-mono mt-0.5">
-                                        {r.revenueCatId}
-                                      </div>
-                                      {r.details &&
-                                      (typeof r.details.minNights === 'number' ||
-                                        typeof r.details.maxNights === 'number') ? (
-                                        <p className="text-xs text-slate-500 mt-1">
-                                          Duration: {r.details.minNights}–{r.details.maxNights} nights
-                                        </p>
-                                      ) : null}
+                                      {renderCatalogRecMeta(r)}
                                       <p className="text-xs text-slate-600 mt-2">{r.description}</p>
                                     </li>
                                   ))}
@@ -1748,7 +1759,7 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
                   return
                 }
                 handleActionClick(
-                  `CALL suggestCatalogPackages NOW for postId "${pid}". Return 1–4 starter package ideas from the fixed catalog (revenueCatId must match). Include sub-day options where relevant (e.g. 4 hours -> 0.5 nights). Then let me approve them.`,
+                  `For postId "${pid}": ask the package placement questions first (add-on vs stay, non-member specials, hosted) if you do not know my answers yet. Then CALL suggestCatalogPackages with a hint that includes my placement preferences. Return 1–4 catalog ideas so I can approve them.`,
                 )
               }}
               disabled={chatIsLoading}
