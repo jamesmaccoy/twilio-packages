@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import configPromise from '@/payload.config'
 import { yocoService } from '@/lib/yocoService'
-import { getCustomerEntitlement, type CustomerEntitlement } from '@/utils/packageSuggestions'
+import {
+  getCustomerEntitlement,
+  normalizePackageEntitlement,
+  type CustomerEntitlement,
+} from '@/utils/packageSuggestions'
 import jwt from 'jsonwebtoken'
 
 async function getAuthedUser(payload: any, request: NextRequest): Promise<any | null> {
@@ -357,9 +361,7 @@ export async function GET(
       .filter((pkg: any) => Boolean(pkg?.isEnabled))
       .filter((pkg: any) => String(pkg?.category || '').trim().toLowerCase() !== 'addon')
       .filter((pkg: any) => {
-        const raw = pkg?.entitlement
-        const pkgEntitlement: CustomerEntitlement =
-          raw === 'none' || raw === 'standard' || raw === 'pro' ? raw : 'standard'
+        const pkgEntitlement = normalizePackageEntitlement(pkg?.entitlement)
 
         // Home editorial grid: show bookable tiers for browsing (not pro-only upsells).
         if (isEditorialPreview) {

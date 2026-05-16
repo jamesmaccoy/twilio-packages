@@ -32,7 +32,12 @@ import { format } from 'date-fns'
 import { hasUnavailableDateBetween } from '@/utilities/hasUnavailableDateBetween'
 import { useUserContext } from '@/context/UserContext'
 import { useSubscription } from '@/hooks/useSubscription'
-import { getCustomerEntitlement, type CustomerEntitlement } from '@/utils/packageSuggestions'
+import {
+  getCustomerEntitlement,
+  isPublicBookablePackage,
+  normalizePackageEntitlement,
+  type CustomerEntitlement,
+} from '@/utils/packageSuggestions'
 import { calculateTotal } from '@/lib/calculateTotal'
 import { useYoco } from '@/providers/Yoco'
 import { yocoService, YocoProduct, YocoPaymentLink } from '@/lib/yocoService'
@@ -317,6 +322,7 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
   // Package loading state to prevent multiple API calls
   const [loadingPackages, setLoadingPackages] = useState(false)
   const [packagesLoaded, setPackagesLoaded] = useState(false)
+  const [hasPublicBookablePackages, setHasPublicBookablePackages] = useState(false)
   
   // Ref to track loading state to prevent infinite loops
   const loadingRef = useRef(false)
@@ -473,7 +479,7 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
         return false
       }
 
-      const pkgEntitlement = (pkg.entitlement || 'standard') as CustomerEntitlement
+      const pkgEntitlement = normalizePackageEntitlement(pkg.entitlement)
 
       // Entitlement-based gating (preferred).
       // - entitlement=none: visible to everyone (including guests / unsubscribed)
@@ -527,11 +533,15 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.error || `Failed to load packages (HTTP ${res.status})`)
 
-      const filtered = (data?.packages || []).filter((pkg: Package) => {
+      const rawPackages: Package[] = data?.packages || []
+      const publicBookable = rawPackages.some((pkg) => isPublicBookablePackage(pkg))
+      setHasPublicBookablePackages(publicBookable)
+
+      const filtered = rawPackages.filter((pkg: Package) => {
         if (!pkg.isEnabled) return false
         if (pkg.category === 'addon') return false
 
-        const pkgEntitlement = (pkg.entitlement || 'standard') as CustomerEntitlement
+        const pkgEntitlement = normalizePackageEntitlement(pkg.entitlement)
         if (customerEntitlement === 'none') return pkgEntitlement === 'none'
         if (customerEntitlement === 'standard') return pkgEntitlement === 'standard'
         if (customerEntitlement === 'pro') return pkgEntitlement === 'standard' || pkgEntitlement === 'pro'
@@ -540,9 +550,10 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
         return true
       })
 
-      originalPackagesRef.current = data?.packages || []
+      originalPackagesRef.current = rawPackages
       setPackages(sortPackagesForDisplay(filtered))
       loadedRef.current = true
+      setPackagesLoaded(true)
     } catch (e) {
       console.error('Error loading packages:', e)
     } finally {
@@ -1123,6 +1134,7 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
     
     // Re-filter packages when entitlement changes
     if (originalPackagesRef.current.length > 0) {
+      setHasPublicBookablePackages(originalPackagesRef.current.some((pkg) => isPublicBookablePackage(pkg)))
       const filtered = filterPackagesByEntitlement(originalPackagesRef.current)
       setPackages(sortPackagesForDisplay(filtered))
     }
@@ -2582,9 +2594,9 @@ ${packages.map((pkg: any, index: number) =>
 ).join('\n\n')}
 
 **Filtering Logic:**
-- Non-subscribers see: hosted, special packages only
-- Standard subscribers see: standard, hosted, special packages
-- Pro subscribers see: all packages
+- Non-subscribers see: packages with entitlement=none only (any category)
+- Standard subscribers see: packages with entitlement=standard only
+- Pro subscribers see: entitlement=standard or pro
 - Addon packages are filtered out (booking page only)
             `
             
@@ -3417,11 +3429,11 @@ ${parsedDates.startDate && parsedDates.endDate ? `\nIMPORTANT: User just request
     }
   }, [postId, currentUser?.id])
 
-  // For non-subscribers, only show the assistant if there is at least one guest-eligible package.
-  // (Otherwise we end up showing both the subscriber gate and this assistant.)
+  // For non-subscribers, only show the assistant when at least one package has entitlement=none.
+  // (Otherwise we show the member-only gate instead of an empty assistant.)
   if (!isSubscriptionLoading && !isSubscribed) {
     if (!loadedRef.current) return null
-    if (packages.length === 0) return null
+    if (!hasPublicBookablePackages) return null
   }
   
   return (

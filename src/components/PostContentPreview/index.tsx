@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Lock, Clock, User, ChevronRight } from 'lucide-react'
 import { useSubscription } from '@/hooks/useSubscription'
+import { isPublicBookablePackage } from '@/utils/packageSuggestions'
 import { formatDateTime } from '@/utilities/formatDateTime'
 import { formatAuthors } from '@/utilities/formatAuthors'
 import type { Post } from '@/payload-types'
@@ -103,14 +104,13 @@ export const PostContentPreview: React.FC<{
     }
 
     let isCancelled = false
-    fetch(`/api/packages/post/${postId}`)
+    fetch(`/api/packages/post/${postId}`, { credentials: 'include' })
       .then((res) => res.json())
       .then((data) => {
         if (isCancelled) return
         const packages = Array.isArray(data?.packages) ? data.packages : []
-        // This endpoint already filters based on the current user's entitlement (or 'none' for guests).
-        // If *any* package is returned, guests have something bookable and we should hide the member-only gate.
-        const hasEligibleGuestPackage = packages.some((pkg: any) => Boolean(pkg?.isEnabled))
+        // Hide the member-only gate when at least one package is explicitly entitlement=none (bookable without subscription).
+        const hasEligibleGuestPackage = packages.some((pkg: any) => isPublicBookablePackage(pkg))
         setHasGuestPackage(hasEligibleGuestPackage)
       })
       .catch(() => {

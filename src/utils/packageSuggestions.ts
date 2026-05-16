@@ -3,6 +3,23 @@ import { SubscriptionStatus } from '@/hooks/useSubscription'
 // Define customer entitlement types
 export type CustomerEntitlement = 'standard' | 'pro' | 'none'
 
+/** Normalize a package's entitlement field (missing/invalid => standard = member-only). */
+export function normalizePackageEntitlement(raw: unknown): CustomerEntitlement {
+  if (raw === 'none' || raw === 'standard' || raw === 'pro') return raw
+  return 'standard'
+}
+
+/** True when a non-subscriber may book this package (explicit entitlement=none). */
+export function isPublicBookablePackage(pkg: {
+  isEnabled?: boolean
+  category?: string
+  entitlement?: unknown
+}): boolean {
+  if (!pkg?.isEnabled) return false
+  if (String(pkg.category || '').trim().toLowerCase() === 'addon') return false
+  return normalizePackageEntitlement(pkg.entitlement) === 'none'
+}
+
 // Enhanced package interface
 export interface SuggestedPackage {
   id: string

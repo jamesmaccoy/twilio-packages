@@ -169,7 +169,7 @@ export default async function Bookings() {
     <>
       <PageClient />
       <EstimateAds estimate={estimateForAds} />
-      <div className="flex min-h-screen bg-white font-sans text-slate-900">
+      <div className="flex min-h-screen bg-white dark:bg-background font-sans text-slate-900 dark:text-foreground">
         <main className="flex-1 overflow-y-auto h-screen">
           <div className="max-w-5xl mx-auto px-8 py-12">
             {/* AI Assistant - Primary Tool */}
@@ -180,10 +180,10 @@ export default async function Bookings() {
             />
 
             {/* Bookings Content */}
-            <div className="border-t border-slate-100 pt-12">
+            <div className="border-t border-slate-100 dark:border-border pt-12">
               {upcomingBookings.docs.length === 0 && pastBookings.docs.length === 0 ? (
                 <div className="text-center py-10">
-                  <h2 className="text-4xl font-medium tracking-tighter mb-4">No bookings</h2>
+                  <h2 className="text-4xl font-medium tracking-tighter mb-4 text-foreground">No bookings</h2>
                   <p className="text-muted-foreground">
                     You don&apos;t have any upcoming or past bookings.
                   </p>

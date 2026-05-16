@@ -80,7 +80,7 @@ export function BookingsClient({ upcomingBookings, pastBookings }: BookingsClien
       )}
 
       {past.length > 0 && (
-        <div className="opacity-80 hover:opacity-100 transition-opacity duration-300">
+        <div className="opacity-80 hover:opacity-100 dark:opacity-90 dark:hover:opacity-100 transition-opacity duration-300">
           <BookingCarousel
             title="Past Bookings"
             bookings={past}
