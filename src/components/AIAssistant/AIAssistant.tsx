@@ -100,8 +100,20 @@ interface PackageSuggestion {
 }
 
 type AIAssistantMode = 'floating' | 'embedded'
+type AIAssistantVariant = 'marketplace' | 'booking'
 
-export const AIAssistant = ({ mode = 'floating' }: { mode?: AIAssistantMode }) => {
+type AIAssistantProps = {
+  mode?: AIAssistantMode
+  /** When set (e.g. booking details page), assistant focuses on this context instead of marketplace discovery. */
+  initialContext?: Record<string, unknown> | null
+  variant?: AIAssistantVariant
+}
+
+export const AIAssistant = ({
+  mode = 'floating',
+  initialContext = null,
+  variant = 'marketplace',
+}: AIAssistantProps) => {
   const { currentUser } = useUserContext()
   const { isSubscribed } = useSubscription()
   const router = useRouter()
@@ -112,6 +124,7 @@ export const AIAssistant = ({ mode = 'floating' }: { mode?: AIAssistantMode }) =
   const isHostOrAdmin = userRole.includes('host') || userRole.includes('admin')
   const subscriptionPlan = currentUser?.subscriptionStatus?.plan || 'none'
   const hasStandardOrPro = isSubscribed && ['basic', 'pro', 'enterprise'].includes(subscriptionPlan) || isHostOrAdmin
+  const isBookingVariant = variant === 'booking' || initialContext?.context === 'booking-details'
 
   // State
   const [isOpen, setIsOpen] = useState(false)
@@ -133,6 +146,24 @@ export const AIAssistant = ({ mode = 'floating' }: { mode?: AIAssistantMode }) =
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const activeThreadRef = useRef(0)
   const historyKeyRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (initialContext) {
+      setCurrentContext(initialContext)
+    }
+  }, [initialContext])
+
+  useEffect(() => {
+    const onOpen = (event: Event) => {
+      const detail = (event as CustomEvent)?.detail
+      if (detail && typeof detail === 'object') {
+        setCurrentContext(detail)
+      }
+      if (mode === 'floating') setIsOpen(true)
+    }
+    window.addEventListener('openAIAssistant', onOpen as EventListener)
+    return () => window.removeEventListener('openAIAssistant', onOpen as EventListener)
+  }, [mode])
 
   // Only auto-open/close for floating mode.
   useEffect(() => {
@@ -194,14 +225,31 @@ export const AIAssistant = ({ mode = 'floating' }: { mode?: AIAssistantMode }) =
     setIsLoading(true)
 
     try {
-      const contextPayload = {
+      const contextKey =
+        currentContext?.context === 'booking-details'
+          ? 'booking-details'
+          : currentContext?.context || (isBookingVariant ? 'booking-details' : 'marketplace-general')
+
+      const contextPayload: Record<string, unknown> = {
         message: messageToSend,
-        context: currentContext?.context || 'marketplace-general',
+        context: contextKey,
         tier: subscriptionPlan,
         isHost: isHostOrAdmin,
         usage: lastUsage?.total || 0,
         pageData: currentContext,
         path: pathname,
+      }
+
+      if (currentContext?.context === 'booking-details') {
+        const booking = currentContext.booking as Record<string, unknown> | undefined
+        const property = currentContext.property as Record<string, unknown> | undefined
+        contextPayload.message = `[Booking assistant] User is viewing their booking${booking?.title ? `: ${booking.title}` : ''}.
+Property: ${property?.title || 'unknown'}
+Dates: ${booking?.fromDate || '?'} to ${booking?.toDate || '?'}
+WiFi on file: ${property?.wifi ? 'yes' : 'not set'}
+Lockbox on file: ${property?.lockbox ? 'yes' : 'not set'}
+House manual: ${property?.houseManualUrl || currentContext.houseManualUrl || 'https://www.simpleplek.co.za/house-manual'}
+Question: ${messageToSend}`
       }
 
       // Enhanced prompt engineering for "Simple" Marketplace Concierge
@@ -266,11 +314,13 @@ export const AIAssistant = ({ mode = 'floating' }: { mode?: AIAssistantMode }) =
           </div>
           <div>
             <h3 className="font-bold text-sm leading-none flex items-center gap-2">
-              Marketplace Concierge
+              {isBookingVariant ? 'Booking assistant' : 'Marketplace Concierge'}
               <TierBadge />
             </h3>
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-1 font-medium">
-              {subscriptionPlan} Member • {lastUsage?.total || 0} tokens used
+              {isBookingVariant
+                ? 'Your stay • check-in & package help'
+                : `${subscriptionPlan} Member • ${lastUsage?.total || 0} tokens used`}
             </p>
           </div>
         </div>
@@ -298,19 +348,79 @@ export const AIAssistant = ({ mode = 'floating' }: { mode?: AIAssistantMode }) =
           {messages.length === 0 && (
             <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
               <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
-                <p className="text-sm font-medium text-primary mb-1">Welcome to the Marketplace</p>
+                <p className="text-sm font-medium text-primary mb-1">
+                  {isBookingVariant ? 'Help with your booking' : 'Welcome to the Marketplace'}
+                </p>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  I'm your Simple assistant, optimized for your <strong>{subscriptionPlan}</strong> tier.
-                  I can help you find properties, manage bookings, or optimize schedules.
+                  {isBookingVariant ? (
+                    <>
+                      Ask about check-in, WiFi, lockbox access, your package, or the{' '}
+                      <a
+                        href="https://www.simpleplek.co.za/house-manual"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline"
+                      >
+                        house manual
+                      </a>
+                      .
+                    </>
+                  ) : (
+                    <>
+                      I&apos;m your Simple assistant, optimized for your <strong>{subscriptionPlan}</strong> tier.
+                      I can help you find properties, manage bookings, or optimize schedules.
+                    </>
+                  )}
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <Button variant="outline" size="sm" className="text-[11px] h-auto py-2 justify-start" onClick={() => handleSendMessage("Show me top properties")}>
-                  <MapPin className="h-3 w-3 mr-2" /> Top Properties
-                </Button>
-                <Button variant="outline" size="sm" className="text-[11px] h-auto py-2 justify-start" onClick={() => handleSendMessage("Check my availability")}>
-                  <CalendarDays className="h-3 w-3 mr-2" /> Availability
-                </Button>
+                {isBookingVariant ? (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-[11px] h-auto py-2 justify-start"
+                      onClick={() => handleSendMessage('What are my check-in and check-out times?')}
+                    >
+                      <Clock className="h-3 w-3 mr-2" /> Check-in times
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-[11px] h-auto py-2 justify-start"
+                      onClick={() => handleSendMessage('What WiFi and lockbox details do I have for this stay?')}
+                    >
+                      <ShieldCheck className="h-3 w-3 mr-2" /> WiFi & access
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-[11px] h-auto py-2 justify-start col-span-2"
+                      onClick={() => handleSendMessage('Summarize what my package includes for this booking')}
+                    >
+                      <CalendarDays className="h-3 w-3 mr-2" /> My package
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-[11px] h-auto py-2 justify-start"
+                      onClick={() => handleSendMessage('Show me top properties')}
+                    >
+                      <MapPin className="h-3 w-3 mr-2" /> Top Properties
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-[11px] h-auto py-2 justify-start"
+                      onClick={() => handleSendMessage('Check my availability')}
+                    >
+                      <CalendarDays className="h-3 w-3 mr-2" /> Availability
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -339,7 +449,11 @@ export const AIAssistant = ({ mode = 'floating' }: { mode?: AIAssistantMode }) =
             <PromptInputTextarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask anything about the marketplace..."
+              placeholder={
+                isBookingVariant
+                  ? 'Ask about your booking, check-in, WiFi, or house manual...'
+                  : 'Ask anything about the marketplace...'
+              }
               className="min-h-[80px] text-sm resize-none border-none focus-visible:ring-0 p-0"
             />
           </PromptInputBody>

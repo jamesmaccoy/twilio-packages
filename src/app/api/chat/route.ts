@@ -430,6 +430,69 @@ Answer the user's question in 2 parts:
       return NextResponse.json({ message: text, response: text, usage })
     }
 
+    if (context === 'booking-details' && pageData) {
+      const booking = pageData.booking || {}
+      const property = pageData.property || {}
+      const addons = Array.isArray(pageData.addons) ? pageData.addons : []
+      const checkinInfo = Array.isArray(pageData.checkinInfo) ? pageData.checkinInfo : []
+      const houseManualUrl =
+        pageData.houseManualUrl || property.houseManualUrl || 'https://www.simpleplek.co.za/house-manual'
+
+      const systemPrompt = `You are a booking assistant for a guest viewing THEIR ACTIVE BOOKING on SimplePlek (South Africa).
+
+Focus ONLY on this booking: dates, property, package, check-in, WiFi, lockbox/access, house manual, and add-ons already on the booking.
+Do NOT suggest browsing other properties or marketplace discovery unless the guest explicitly asks to book elsewhere.
+
+Booking summary:
+${JSON.stringify(booking, null, 2)}
+
+Property (host listing):
+${JSON.stringify(
+        {
+          title: property.title,
+          description: property.description,
+          wifi: property.wifi || null,
+          lockbox: property.lockbox || null,
+          houseManualUrl,
+        },
+        null,
+        2,
+      )}
+
+Add-ons linked to this booking:
+${JSON.stringify(addons, null, 2)}
+
+Check-in pages (if any):
+${JSON.stringify(checkinInfo.slice(0, 5), null, 2)}
+
+Rules:
+- If WiFi or lockbox is null/empty, say the host has not added it yet and point them to the house manual: ${houseManualUrl}
+- Never invent WiFi passwords or lockbox codes.
+- Be practical and concise. You are not a lawyer.
+- For general property guides, direct them to open the house manual: ${houseManualUrl}`
+
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+      const chat = model.startChat({
+        history: [
+          { role: 'user', parts: [{ text: systemPrompt }] },
+          {
+            role: 'model',
+            parts: [{ text: "I'll help with this booking only — check-in, access, package, and house manual." }],
+          },
+        ],
+      })
+
+      const messageText = String(message || '').trim()
+      if (!messageText) {
+        return NextResponse.json({ error: 'Message is required' }, { status: 400 })
+      }
+      const result = await chat.sendMessage(messageText)
+      const response = await result.response
+      const text = response.text()
+      const usage = serializeUsageMetadata(response.usageMetadata)
+      return NextResponse.json({ message: text, response: text, usage })
+    }
+
     const [bookings, estimates, packages] = await Promise.all([
       payload.find({
         collection: 'bookings',

@@ -44,6 +44,8 @@ export default function NewPropertyOnboardingClient() {
   const router = useRouter()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [wifi, setWifi] = useState('')
+  const [lockbox, setLockbox] = useState('')
   const [heroFile, setHeroFile] = useState<File | null>(null)
   const [heroPreviewUrl, setHeroPreviewUrl] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -80,6 +82,8 @@ export default function NewPropertyOnboardingClient() {
         body: JSON.stringify({
           title: title.trim(),
           description: description.trim(),
+          ...(wifi.trim() ? { wifi: wifi.trim() } : {}),
+          ...(lockbox.trim() ? { lockbox: lockbox.trim() } : {}),
           ...(heroImageId ? { heroImage: heroImageId } : {}),
         }),
       })
@@ -132,6 +136,25 @@ export default function NewPropertyOnboardingClient() {
               placeholder="A short description guests will see. You can edit later."
               className="min-h-[140px]"
             />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">WiFi (optional)</label>
+              <Input
+                value={wifi}
+                onChange={(e) => setWifi(e.target.value)}
+                placeholder="Network name and password"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Lockbox / access (optional)</label>
+              <Input
+                value={lockbox}
+                onChange={(e) => setLockbox(e.target.value)}
+                placeholder="Key safe code or entry instructions"
+              />
+            </div>
           </div>
 
           <div>

@@ -327,6 +327,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
 
+    if (body.wifi !== undefined) {
+      cleanData.wifi =
+        body.wifi === null || body.wifi === '' ? null : String(body.wifi).trim()
+    }
+
+    if (body.lockbox !== undefined) {
+      cleanData.lockbox =
+        body.lockbox === null || body.lockbox === '' ? null : String(body.lockbox).trim()
+    }
+
     // Handle baseRate safely
     if (body.baseRate !== undefined) {
       if (body.baseRate === null || body.baseRate === '') {

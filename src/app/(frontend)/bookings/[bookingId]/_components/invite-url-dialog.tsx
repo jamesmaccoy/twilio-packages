@@ -13,37 +13,42 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { CopyIcon, Loader2Icon } from 'lucide-react'
-import React, { FC, useCallback, useEffect } from 'react'
+import React, { FC, useEffect } from 'react'
 
 type Props = {
   trigger: React.ReactNode
   bookingId: string
+  onInviteUrlChange?: (url: string) => void
 }
 
-const InviteUrlDialog: FC<Props> = ({ trigger, bookingId }) => {
+const InviteUrlDialog: FC<Props> = ({ trigger, bookingId, onInviteUrlChange }) => {
   const [token, setToken] = React.useState<string | null>(null)
   const [copied, setCopied] = React.useState(false)
   const [tokenUrl, setTokenUrl] = React.useState<string>('')
   const [isLoading, setIsLoading] = React.useState(false)
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
 
   //? Fetch the token from the server.
   useEffect(() => {
     const fetchToken = async () => {
       try {
         setIsLoading(true)
+        setErrorMessage(null)
         const res = await fetch(`/api/bookings/${bookingId}/token`, {
           method: 'POST',
           credentials: 'include',
         })
 
         if (!res.ok) {
-          throw new Error('Failed to fetch token')
+          const data = await res.json().catch(() => null)
+          throw new Error(data?.message || 'Failed to fetch token')
         }
 
         const data = await res.json()
         setToken(data.token)
       } catch (error) {
-        console.error('Error fetching token:', error)
+        const message = error instanceof Error ? error.message : 'Failed to generate invite link'
+        setErrorMessage(message)
       } finally {
         setIsLoading(false)
       }
@@ -69,8 +74,9 @@ const InviteUrlDialog: FC<Props> = ({ trigger, bookingId }) => {
       // Use shorter URL path for better social media compatibility
       const url = `${window.location.origin}/i/${token}`
       setTokenUrl(url)
+      onInviteUrlChange?.(url)
     }
-  }, [token])
+  }, [token, onInviteUrlChange])
 
   //? Copy the token URL to the clipboard.
   const copyTextHandler = () => {
@@ -83,19 +89,22 @@ const InviteUrlDialog: FC<Props> = ({ trigger, bookingId }) => {
   const refreshTokenHandler = async () => {
     try {
       setIsLoading(true)
+      setErrorMessage(null)
       const res = await fetch(`/api/bookings/${bookingId}/refresh-token`, {
         method: 'POST',
         credentials: 'include',
       })
 
       if (!res.ok) {
-        throw new Error('Failed to refresh token')
+        const data = await res.json().catch(() => null)
+        throw new Error(data?.message || 'Failed to refresh token')
       }
 
       const data = await res.json()
       setToken(data.token)
     } catch (error) {
-      console.error('Error refreshing token:', error)
+      const message = error instanceof Error ? error.message : 'Failed to refresh invite link'
+      setErrorMessage(message)
     } finally {
       setIsLoading(false)
     }
@@ -117,6 +126,10 @@ const InviteUrlDialog: FC<Props> = ({ trigger, bookingId }) => {
           <div className="flex items-center justify-center gap-2">
             <Loader2Icon className="text-muted-foreground size-6 animate-spin" />
             <span className="text-muted-foreground">Generating link...</span>
+          </div>
+        ) : errorMessage ? (
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+            {errorMessage}
           </div>
         ) : (
           <div>

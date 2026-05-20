@@ -401,6 +401,14 @@ export interface Post {
    */
   googleCalendarUrl?: string | null;
   /**
+   * Network name and password for guests (shared in the booking assistant and house manual context).
+   */
+  wifi?: string | null;
+  /**
+   * Key safe code or smart-lock instructions for guest check-in.
+   */
+  lockbox?: string | null;
+  /**
    * Custom settings for packages associated with this post
    */
   packageSettings?:
@@ -1724,6 +1732,8 @@ export interface PostsSelect<T extends boolean = true> {
       };
   baseRate?: T;
   googleCalendarUrl?: T;
+  wifi?: T;
+  lockbox?: T;
   packageSettings?:
     | T
     | {

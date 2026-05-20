@@ -12,6 +12,7 @@ import {
   Calendar as CalendarIcon,
   Sparkles,
   Share2,
+  Copy,
   MapPin,
   Clock,
   Users,
@@ -22,7 +23,6 @@ import {
   Check,
   Star,
   ExternalLink,
-  QrCode,
   Home,
   CreditCard,
   Shield,
@@ -32,12 +32,13 @@ import React, { useCallback, useEffect, useState } from 'react'
 import InviteUrlDialog from './_components/invite-url-dialog'
 import SimplePageRenderer from './_components/SimplePageRenderer'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { useYoco } from '@/providers/Yoco'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Calendar } from '@/components/ui/calendar'
 import { AIAssistant } from '@/components/AIAssistant/AIAssistant'
 import { format } from 'date-fns'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { calculateTotal } from '@/lib/calculateTotal'
 import { PackageDisplay } from '@/components/PackageDisplay'
 import { BookingInfoCard } from '@/components/BookingInfoCard'
@@ -47,7 +48,7 @@ import BookingSidebar from './_components/BookingSidebar'
 import { getGravatarUrl } from '@/utils/gravatar'
 import { Gravatar } from '@/components/Gravatar'
 import { Media } from '@/components/Media'
-import { QRCodeSVG } from 'qrcode.react'
+import { HOUSE_MANUAL_URL } from '@/lib/houseManual'
 import {
   Carousel,
   CarouselContent,
@@ -107,16 +108,15 @@ const handleAddToCalendar = async (booking: Booking) => {
   }
 }
 
-// Helper to get QR code URL (house manual page)
-const getQRCodeUrl = (booking: Booking) => {
-  // Link to house manual page
-  return 'https://www.simpleplek.co.za/house-manual'
-}
-
 export default function BookingDetailsClientPage({ data, user, isPreview }: Props) {
   const [removedGuests, setRemovedGuests] = React.useState<string[]>([])
   const router = useRouter()
+  const searchParams = useSearchParams()
   const previewMode = Boolean(isPreview)
+  const [activeTab, setActiveTab] = useState(searchParams?.get('tab') === 'share' ? 'share' : 'trip')
+  const [shareLink, setShareLink] = useState('')
+  const [shareLinkCopied, setShareLinkCopied] = useState(false)
+  const [isLoadingShareLink, setIsLoadingShareLink] = useState(false)
 
   const [addonPackages, setAddonPackages] = useState<AddonPackage[]>([])
   const [loadingAddons, setLoadingAddons] = useState(true)
@@ -194,6 +194,74 @@ export default function BookingDetailsClientPage({ data, user, isPreview }: Prop
     }
   }, [loadingAddons])
 
+  const isBookingOwner =
+    Boolean(
+      data &&
+        typeof data.customer !== 'string' &&
+        data.customer &&
+        'id' in data.customer &&
+        data.customer.id === user.id,
+    ) && !previewMode
+
+  const sharePostTitle =
+    typeof data?.post === 'object' && data.post?.title ? data.post.title : 'Booking Details'
+
+  useEffect(() => {
+    const fetchShareLink = async () => {
+      if (!data?.id || !isBookingOwner) return
+
+      try {
+        setIsLoadingShareLink(true)
+        const res = await fetch(`/api/bookings/${data.id}/token`, {
+          method: 'POST',
+          credentials: 'include',
+        })
+
+        if (res.ok) {
+          const json = await res.json()
+          if (json.token) {
+            setShareLink(`${window.location.origin}/i/${json.token}`)
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching share link:', error)
+      } finally {
+        setIsLoadingShareLink(false)
+      }
+    }
+
+    fetchShareLink()
+  }, [data?.id, isBookingOwner])
+
+  const copyShareLink = useCallback(() => {
+    if (!shareLink) return
+    navigator.clipboard.writeText(shareLink)
+    setShareLinkCopied(true)
+    setTimeout(() => setShareLinkCopied(false), 2000)
+  }, [shareLink])
+
+  const handleShare = useCallback(() => {
+    setActiveTab('share')
+    if (typeof window !== 'undefined') {
+      document.getElementById('booking-page-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+    if (navigator.share && shareLink) {
+      navigator
+        .share({
+          title: sharePostTitle,
+          text: 'Join my booking',
+          url: shareLink,
+        })
+        .catch(() => copyShareLink())
+    } else if (shareLink) {
+      copyShareLink()
+    }
+  }, [shareLink, copyShareLink, sharePostTitle])
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value)
+  }
+
   const removeGuestHandler = async (guestId: string) => {
     if (previewMode) return
     const res = await fetch(`/api/bookings/${data.id}/guests/${guestId}`, {
@@ -233,12 +301,16 @@ export default function BookingDetailsClientPage({ data, user, isPreview }: Prop
           description: post.meta?.description || '',
           content: post.content,
           baseRate: post.baseRate,
+          wifi: post.wifi || '',
+          lockbox: post.lockbox || '',
+          houseManualUrl: HOUSE_MANUAL_URL,
           relatedPosts: post.relatedPosts || [],
           categories: Array.isArray(post.categories)
             ? post.categories.map((c: any) => typeof c === 'object' ? c : c)
             : [],
         }
         : null,
+      houseManualUrl: HOUSE_MANUAL_URL,
       guests: {
         customer:
           typeof booking?.customer === 'string'
@@ -274,7 +346,6 @@ export default function BookingDetailsClientPage({ data, user, isPreview }: Prop
   }, [addonPackages, data, relatedPages])
 
   const bookingContext = React.useMemo(() => getBookingContext(), [getBookingContext])
-  const bookingContextJson = React.useMemo(() => JSON.stringify(bookingContext ?? {}), [bookingContext])
 
   const handleAskAssistant = useCallback(() => {
     if (typeof window === 'undefined') return
@@ -598,10 +669,14 @@ export default function BookingDetailsClientPage({ data, user, isPreview }: Prop
   // Get post location (if available)
   const postLocation = 'Llandudno, Cape Town, South Africa' // Default, can be enhanced with actual post data
 
-  // Get host information
-  const host = typeof data?.customer === 'object' ? data.customer : null
-  const hostName = host?.name || 'Host'
-  const hostEmail = host?.email || ''
+  const customer = typeof data?.customer === 'object' ? data.customer : null
+  const customerName = customer?.name || 'Primary guest'
+  const customerEmail = customer?.email || ''
+
+  const propertyHost =
+    post && typeof post === 'object' && post.host && typeof post.host === 'object' ? post.host : null
+  const propertyHostName = propertyHost?.name || 'Host'
+  const propertyHostEmail = propertyHost?.email || ''
 
   // Calculate total paid
   const totalPaid = currentPackageTotal || data?.total || 0
@@ -624,7 +699,13 @@ export default function BookingDetailsClientPage({ data, user, isPreview }: Prop
               </>
             )}
           </div>
-          <Button variant="outline" size="sm" className="gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={handleShare}
+            disabled={previewMode}
+          >
             <Share2 className="h-4 w-4" />
             Share
           </Button>
@@ -668,6 +749,19 @@ export default function BookingDetailsClientPage({ data, user, isPreview }: Prop
 
       {/* Main Content */}
       <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4">
+        <Tabs id="booking-page-tabs" value={activeTab} onValueChange={handleTabChange} className="w-full space-y-4">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="trip" className="gap-2">
+              <CalendarIcon className="h-4 w-4" />
+              Your Trip
+            </TabsTrigger>
+            <TabsTrigger value="share" className="gap-2">
+              <Share2 className="h-4 w-4" />
+              Share
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="trip" className="space-y-4 mt-0">
         {/* Status Timeline */}
         <Card>
           <CardContent className="p-6">
@@ -751,42 +845,6 @@ export default function BookingDetailsClientPage({ data, user, isPreview }: Prop
           </Button>
         </div>
 
-        {/* Check-in QR Code */}
-        <Card className="bg-gradient-to-br from-teal-50 to-transparent">
-          <CardContent className="p-6">
-            <div className="flex items-start gap-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <QrCode className="h-5 w-5 text-teal-500" />
-                  <h3 className="font-semibold">Digital Check-in</h3>
-                </div>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Show this QR code at arrival for contactless check-in
-                </p>
-                <Button
-                  variant="default"
-                  size="sm"
-                  className="gap-2"
-                  onClick={() => {
-                    const qrUrl = getQRCodeUrl(data)
-                    window.open(qrUrl, '_blank')
-                  }}
-                >
-                  <Download className="h-4 w-4" />
-                  Open House Manual
-                </Button>
-              </div>
-              <div className="h-24 w-24 rounded-lg bg-white border-2 border-teal-500/20 flex items-center justify-center p-2">
-                <QRCodeSVG
-                  value={getQRCodeUrl(data)}
-                  size={80}
-                  level="M"
-                  includeMargin={false}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Location */}
         <Card className="overflow-hidden">
@@ -859,152 +917,6 @@ export default function BookingDetailsClientPage({ data, user, isPreview }: Prop
             </CardContent>
           </Card>
         )}
-
-        {/* Host Information */}
-        {host && (
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Home className="h-5 w-5 text-teal-500" />
-                <h3 className="font-semibold">Your Host</h3>
-              </div>
-
-              <div className="flex items-center gap-4 mb-4">
-                <Gravatar
-                  email={hostEmail}
-                  size={64}
-                  alt={hostName}
-                  className="h-16 w-16 rounded-full border-2 border-teal-500"
-                  fallback={
-                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-teal-500 text-white">
-                      <UserIcon className="h-8 w-8" />
-                    </div>
-                  }
-                />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="font-semibold">{hostName}</p>
-                    <Badge variant="default" className="text-xs">
-                      Host
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                    <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
-                    <span>4.9 • 127 reviews</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <Button variant="outline" className="gap-2">
-                  <MessageCircle className="h-4 w-4" />
-                  Message
-                </Button>
-                <Button variant="outline" className="gap-2" asChild>
-                  <a href={`mailto:${hostEmail}`}>
-                    <Phone className="h-4 w-4" />
-                    Contact
-                  </a>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Guests */}
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-teal-500" />
-                <h3 className="font-semibold">Guests</h3>
-              </div>
-              {data &&
-                'customer' in data &&
-                typeof data?.customer !== 'string' &&
-                data.customer &&
-                'id' in data.customer &&
-                data.customer.id === user.id && (
-                  <InviteUrlDialog
-                    bookingId={data.id}
-                    trigger={
-                      <Button size="sm" variant="default" className="gap-2">
-                        <Users className="h-4 w-4" />
-                        Invite Guests
-                      </Button>
-                    }
-                  />
-                )}
-            </div>
-
-            <div className="flex items-center gap-3 rounded-lg border-2 border-teal-500/20 bg-teal-500/5 p-4 mb-3">
-              <Gravatar
-                email={hostEmail}
-                size={40}
-                alt={hostName}
-                className="h-10 w-10 rounded-full"
-                fallback={
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-teal-500 text-white">
-                    <UserIcon className="h-5 w-5" />
-                  </div>
-                }
-              />
-              <div className="flex-1">
-                <p className="font-medium text-sm">{hostName}</p>
-                <p className="text-xs text-muted-foreground">Primary guest</p>
-              </div>
-            </div>
-
-            {data.guests
-              ?.filter((guest) =>
-                typeof guest === 'string'
-                  ? !removedGuests.includes(guest)
-                  : !removedGuests.includes(guest.id),
-              )
-              ?.map((guest) => {
-                if (typeof guest === 'string') return null
-                return (
-                  <div
-                    key={guest.id}
-                    className="flex items-center gap-3 rounded-lg border bg-card p-3 mb-2"
-                  >
-                    <Gravatar
-                      email={guest.email}
-                      size={40}
-                      alt={guest.name || 'Guest'}
-                      className="h-10 w-10 rounded-full"
-                      fallback={
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-                          <UserIcon className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                      }
-                    />
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">{guest.name}</p>
-                      <Badge variant="outline" className="text-xs">
-                        Guest
-                      </Badge>
-                    </div>
-                    {data &&
-                      'customer' in data &&
-                      typeof data?.customer !== 'string' &&
-                      data.customer &&
-                      'id' in data.customer &&
-                      data.customer.id === user.id && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeGuestHandler(guest.id)}
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        >
-                          <TrashIcon className="size-4" />
-                        </Button>
-                      )}
-                  </div>
-                )
-              })}
-          </CardContent>
-        </Card>
 
         {/* Enhance Your Stay - Carousel */}
         {!loadingAddons && addonPackages.length > 0 && (
@@ -1274,20 +1186,6 @@ export default function BookingDetailsClientPage({ data, user, isPreview }: Prop
           </CardContent>
         </Card>
 
-        {/* Footer */}
-        <div className="pt-8 pb-12 text-center space-y-2">
-          {bookingIdDisplay && (
-            <p className="text-xs text-muted-foreground">
-              Booking ID: {bookingIdDisplay}
-            </p>
-          )}
-          {data?.createdAt && (
-            <p className="text-xs text-muted-foreground">
-              Confirmed on {format(new Date(data.createdAt), 'MMMM dd, yyyy')}
-            </p>
-          )}
-        </div>
-
         {/* Check-in Info Tab (if available) */}
         {relatedPages.length > 0 && (
           <Card className="mt-4">
@@ -1322,21 +1220,224 @@ export default function BookingDetailsClientPage({ data, user, isPreview }: Prop
             </CardContent>
           </Card>
         )}
+          </TabsContent>
+
+          <TabsContent value="share" className="space-y-4 mt-0">
+            <Card>
+              <CardContent className="p-6 space-y-4">
+                <div className="flex items-center gap-2">
+                  <Share2 className="h-5 w-5 text-teal-500" />
+                  <h3 className="font-semibold">Invite guests</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Share this link so others can join your booking.
+                </p>
+
+                {isBookingOwner ? (
+                  <>
+                    {isLoadingShareLink ? (
+                      <p className="text-sm text-muted-foreground">Generating invite link...</p>
+                    ) : shareLink ? (
+                      <div className="flex items-center gap-2">
+                        <Input value={shareLink} readOnly className="flex-1 text-sm" />
+                        <Button size="sm" variant="outline" onClick={copyShareLink} className="gap-2 shrink-0">
+                          <Copy className="h-4 w-4" />
+                          {shareLinkCopied ? 'Copied!' : 'Copy'}
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Invite link unavailable. Use the button below to generate one.
+                      </p>
+                    )}
+
+                    <div className="flex flex-wrap gap-2">
+                      <InviteUrlDialog
+                        bookingId={data.id}
+                        onInviteUrlChange={setShareLink}
+                        trigger={
+                          <Button size="sm" variant="default" className="gap-2">
+                            <Users className="h-4 w-4" />
+                            Manage invite link
+                          </Button>
+                        }
+                      />
+                      {shareLink && (
+                        <Button size="sm" variant="outline" className="gap-2" onClick={handleShare}>
+                          <Share2 className="h-4 w-4" />
+                          Share link
+                        </Button>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Only the booking owner can create and share invite links.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            {propertyHost && (
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Home className="h-5 w-5 text-teal-500" />
+                    <h3 className="font-semibold">Your Host</h3>
+                  </div>
+
+                  <div className="flex items-center gap-4 mb-4">
+                    <Gravatar
+                      email={propertyHostEmail}
+                      size={64}
+                      alt={propertyHostName}
+                      className="h-16 w-16 rounded-full border-2 border-teal-500"
+                      fallback={
+                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-teal-500 text-white">
+                          <UserIcon className="h-8 w-8" />
+                        </div>
+                      }
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="font-semibold">{propertyHostName}</p>
+                        <Badge variant="default" className="text-xs">
+                          Host
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
+                        <span>4.9 • 127 reviews</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {propertyHostEmail && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button variant="outline" className="gap-2" asChild>
+                        <a href={`mailto:${propertyHostEmail}`}>
+                          <MessageCircle className="h-4 w-4" />
+                          Message
+                        </a>
+                      </Button>
+                      <Button variant="outline" className="gap-2" asChild>
+                        <a href={`mailto:${propertyHostEmail}`}>
+                          <Phone className="h-4 w-4" />
+                          Contact
+                        </a>
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-teal-500" />
+                    <h3 className="font-semibold">Guests</h3>
+                  </div>
+                  {isBookingOwner && (
+                    <InviteUrlDialog
+                      bookingId={data.id}
+                      onInviteUrlChange={setShareLink}
+                      trigger={
+                        <Button size="sm" variant="default" className="gap-2">
+                          <Users className="h-4 w-4" />
+                          Invite Guests
+                        </Button>
+                      }
+                    />
+                  )}
+                </div>
+
+                {customer && (
+                  <div className="flex items-center gap-3 rounded-lg border-2 border-teal-500/20 bg-teal-500/5 p-4 mb-3">
+                    <Gravatar
+                      email={customerEmail}
+                      size={40}
+                      alt={customerName}
+                      className="h-10 w-10 rounded-full"
+                      fallback={
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-teal-500 text-white">
+                          <UserIcon className="h-5 w-5" />
+                        </div>
+                      }
+                    />
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">{customerName}</p>
+                      <p className="text-xs text-muted-foreground">Primary guest</p>
+                    </div>
+                  </div>
+                )}
+
+                {data.guests
+                  ?.filter((guest) =>
+                    typeof guest === 'string'
+                      ? !removedGuests.includes(guest)
+                      : !removedGuests.includes(guest.id),
+                  )
+                  ?.map((guest) => {
+                    if (typeof guest === 'string') return null
+                    return (
+                      <div
+                        key={guest.id}
+                        className="flex items-center gap-3 rounded-lg border bg-card p-3 mb-2"
+                      >
+                        <Gravatar
+                          email={guest.email}
+                          size={40}
+                          alt={guest.name || 'Guest'}
+                          className="h-10 w-10 rounded-full"
+                          fallback={
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                              <UserIcon className="h-5 w-5 text-muted-foreground" />
+                            </div>
+                          }
+                        />
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">{guest.name}</p>
+                          <Badge variant="outline" className="text-xs">
+                            Guest
+                          </Badge>
+                        </div>
+                        {isBookingOwner && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeGuestHandler(guest.id)}
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <TrashIcon className="size-4" />
+                          </Button>
+                        )}
+                      </div>
+                    )
+                  })}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {/* Footer */}
+        <div className="pt-8 pb-12 text-center space-y-2">
+          {bookingIdDisplay && (
+            <p className="text-xs text-muted-foreground">
+              Booking ID: {bookingIdDisplay}
+            </p>
+          )}
+          {data?.createdAt && (
+            <p className="text-xs text-muted-foreground">
+              Confirmed on {format(new Date(data.createdAt), 'MMMM dd, yyyy')}
+            </p>
+          )}
+        </div>
+
       </div>
 
-      <AIAssistant />
-
-      {/* Set context for AI Assistant */}
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `
-            window.addEventListener('load', function() {
-              const context = ${bookingContextJson};
-              window.bookingContext = context;
-            });
-          `,
-        }}
-      />
+      <AIAssistant initialContext={bookingContext} variant="booking" />
     </div>
   )
 }

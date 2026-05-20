@@ -270,6 +270,25 @@ export const Posts: CollectionConfig<'posts'> = {
       },
     },
     {
+      name: 'wifi',
+      type: 'text',
+      label: 'WiFi details',
+      admin: {
+        position: 'sidebar',
+        description:
+          'Network name and password for guests (shared in the booking assistant and house manual context).',
+      },
+    },
+    {
+      name: 'lockbox',
+      type: 'text',
+      label: 'Lockbox / access code',
+      admin: {
+        position: 'sidebar',
+        description: 'Key safe code or smart-lock instructions for guest check-in.',
+      },
+    },
+    {
       name: 'packageSettings',
       type: 'array',
       label: 'Package Settings',

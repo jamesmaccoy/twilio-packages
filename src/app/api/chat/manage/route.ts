@@ -900,11 +900,28 @@ export async function POST(request: NextRequest) {
         featured: z.boolean().optional().default(false).describe('Feature this property on the home page'),
         metaTitle: z.string().optional().describe('SEO meta title'),
         metaDescription: z.string().optional().describe('SEO meta description'),
+        wifi: z
+          .string()
+          .optional()
+          .describe('WiFi network name and password for the guest house manual'),
+        lockbox: z
+          .string()
+          .optional()
+          .describe('Lockbox code or key-safe / smart-lock instructions for guests'),
       }),
       // @ts-expect-error - AI SDK type inference issue
       execute: async (input: any) => {
         try {
-          const { title: titleRaw, description, baseRate, featured, metaTitle, metaDescription } = input
+          const {
+            title: titleRaw,
+            description,
+            baseRate,
+            featured,
+            metaTitle,
+            metaDescription,
+            wifi,
+            lockbox,
+          } = input
 
           const title = typeof titleRaw === 'string' ? titleRaw.trim() : ''
           if (!title) {
@@ -957,6 +974,10 @@ export async function POST(request: NextRequest) {
             _status: 'draft', // Create as draft, user can publish later
             baseRate: baseRate || undefined,
             featured: featured || false,
+            ...(typeof wifi === 'string' && wifi.trim() ? { wifi: wifi.trim().slice(0, 500) } : {}),
+            ...(typeof lockbox === 'string' && lockbox.trim()
+              ? { lockbox: lockbox.trim().slice(0, 500) }
+              : {}),
           }
 
           // Meta helps /api/packages/suggest-copy and catalog suggestions use property context
@@ -1057,6 +1078,7 @@ export async function POST(request: NextRequest) {
 - **createPostTool** does NOT return package ideas. After it succeeds, reply with the **package placement questions** (add-on vs stay, non-member special, hosted) — do NOT call suggestCatalogPackages or previewPackage until they answer.
 - When they answer, call **suggestCatalogPackages** with **postId** = new post.id and **hint** = their placement answers, OR **previewPackageTool** if they named a specific package/price.
 - Only skip createPostTool if they are clearly working with an **existing** listing already in context.
+- For every new or updated listing, collect **house-manual** details when possible: **wifi** (network + password) and **lockbox** (access code / key-safe instructions). Pass them into createPostTool or remind the host to add them in property settings. Guests see these on their booking assistant.
 
 📋 PACKAGE PLACEMENT (ask before first catalog/preview on a listing):
 Ask these unless the user already answered in the same thread:

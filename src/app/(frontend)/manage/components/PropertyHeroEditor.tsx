@@ -62,6 +62,8 @@ export function PropertyHeroEditor({ postId, onListingDeleted }: PropertyHeroEdi
   const [menuOpen, setMenuOpen] = useState(false)
   const [postTitle, setPostTitle] = useState("")
   const [metaDescription, setMetaDescription] = useState("")
+  const [wifi, setWifi] = useState("")
+  const [lockbox, setLockbox] = useState("")
   const [heroMedia, setHeroMedia] = useState<Media | null>(null)
   const [heroPreviewUrl, setHeroPreviewUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -82,6 +84,8 @@ export function PropertyHeroEditor({ postId, onListingDeleted }: PropertyHeroEdi
       if (!res.ok) throw new Error(data?.error || "Failed to load listing")
       setPostTitle(String(data?.doc?.title || ""))
       setMetaDescription(String(data?.doc?.meta?.description || ""))
+      setWifi(String(data?.doc?.wifi || ""))
+      setLockbox(String(data?.doc?.lockbox || ""))
       const nextHero =
         data?.doc?.heroImage && typeof data.doc.heroImage === "object"
           ? (data.doc.heroImage as Media)
@@ -162,6 +166,8 @@ export function PropertyHeroEditor({ postId, onListingDeleted }: PropertyHeroEdi
           meta: {
             description: metaDescription.trim() || null,
           },
+          wifi: wifi.trim() || null,
+          lockbox: lockbox.trim() || null,
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -363,6 +369,25 @@ export function PropertyHeroEditor({ postId, onListingDeleted }: PropertyHeroEdi
                     placeholder="A short description guests will see. You can edit later."
                     className="min-h-[140px]"
                   />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">WiFi (guest access)</label>
+                    <Input
+                      value={wifi}
+                      onChange={(e) => setWifi(e.target.value)}
+                      placeholder="Network name and password"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Lockbox / access code</label>
+                    <Input
+                      value={lockbox}
+                      onChange={(e) => setLockbox(e.target.value)}
+                      placeholder="Key safe or smart-lock instructions"
+                    />
+                  </div>
                 </div>
 
                 <div>

@@ -59,6 +59,8 @@ export async function POST(req: NextRequest) {
   const heroImageRaw = body?.heroImage
   const heroImage =
     typeof heroImageRaw === 'string' && heroImageRaw.trim().length > 0 ? heroImageRaw.trim() : undefined
+  const wifi = typeof body?.wifi === 'string' ? body.wifi.trim() : ''
+  const lockbox = typeof body?.lockbox === 'string' ? body.lockbox.trim() : ''
 
   if (!title) {
     return NextResponse.json({ error: 'Title is required' }, { status: 400 })
@@ -79,6 +81,8 @@ export async function POST(req: NextRequest) {
       ) as any,
       _status: 'draft',
       ...(heroImage ? { heroImage } : {}),
+      ...(wifi ? { wifi: wifi.slice(0, 500) } : {}),
+      ...(lockbox ? { lockbox: lockbox.slice(0, 500) } : {}),
     },
     user,
   })
