@@ -27,6 +27,7 @@ import {
   CreditCard,
   Shield,
   MessageCircle,
+  MoreHorizontal,
 } from 'lucide-react'
 import React, { useCallback, useEffect, useState } from 'react'
 import InviteUrlDialog from './_components/invite-url-dialog'
@@ -49,6 +50,8 @@ import { getGravatarUrl } from '@/utils/gravatar'
 import { Gravatar } from '@/components/Gravatar'
 import { Media } from '@/components/Media'
 import { HOUSE_MANUAL_URL } from '@/lib/houseManual'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   Carousel,
   CarouselContent,
@@ -133,6 +136,7 @@ export default function BookingDetailsClientPage({ data, user, isPreview }: Prop
 
   const [isSubmittingEstimate, setIsSubmittingEstimate] = useState(false)
   const [estimateError, setEstimateError] = useState<string | null>(null)
+  const [isRescheduleOpen, setIsRescheduleOpen] = useState(false)
   const [assistantHistory, setAssistantHistory] = useState<
     {
       role: 'user' | 'assistant'
@@ -767,9 +771,32 @@ export default function BookingDetailsClientPage({ data, user, isPreview }: Prop
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold">Your Trip</h2>
-              {daysUntilBooking !== null && (
-                <span className="text-2xl font-bold text-teal-500">{Math.abs(daysUntilBooking)} {daysUntilBooking === 1 ? 'day' : 'days'}</span>
-              )}
+              <div className="flex items-center gap-2">
+                {daysUntilBooking !== null && (
+                  <span className="text-2xl font-bold text-teal-500">
+                    {Math.abs(daysUntilBooking)} {daysUntilBooking === 1 ? 'day' : 'days'}
+                  </span>
+                )}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" className="-mr-2">
+                      <MoreHorizontal className="h-5 w-5" />
+                      <span className="sr-only">Trip actions</span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-56 p-1">
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start"
+                      onClick={() => {
+                        setIsRescheduleOpen(true)
+                      }}
+                    >
+                      Reschedule booking
+                    </Button>
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
 
             <div className="relative">
@@ -822,6 +849,151 @@ export default function BookingDetailsClientPage({ data, user, isPreview }: Prop
             </div>
           </CardContent>
         </Card>
+
+        <Dialog open={isRescheduleOpen} onOpenChange={setIsRescheduleOpen}>
+          <DialogContent className="max-w-xl">
+            <DialogHeader>
+              <DialogTitle>Reschedule booking</DialogTitle>
+              <DialogDescription>Select new dates to create a reschedule estimate.</DialogDescription>
+            </DialogHeader>
+            <BookingInfoCard
+              variant="booking"
+              postUrl={typeof data?.post === 'object' && data.post ? `/posts/${data.post.slug || ''}` : undefined}
+              postId={typeof data?.post === 'string' ? data.post : (typeof data?.post === 'object' && data.post ? data.post.id : undefined)}
+              postTitle={typeof data?.post === 'object' && data.post ? data.post.title : undefined}
+              packageMinNights={packageSnapshot?.minNights ?? null}
+              packageMaxNights={packageSnapshot?.maxNights ?? null}
+              isReschedule={true}
+              originalBookingDates={data?.fromDate && data?.toDate ? {
+                from: new Date(data.fromDate as string),
+                to: new Date(data.toDate as string)
+              } : null}
+              onEstimateRequest={async (dates) => {
+                setIsSubmittingEstimate(true)
+                setEstimateError(null)
+
+                try {
+                  const postId = typeof data?.post === 'string' ? data.post : data?.post?.id
+                  if (!postId) {
+                    throw new Error('No post ID found')
+                  }
+
+                  if (!packageSnapshot?.id) {
+                    throw new Error('Original booking package not found. Cannot reschedule.')
+                  }
+
+                  const fromDateObj = new Date(dates.from)
+                  const toDateObj = new Date(dates.to)
+                  const duration = Math.max(
+                    1,
+                    Math.round((toDateObj.getTime() - fromDateObj.getTime()) / (1000 * 60 * 60 * 24)),
+                  )
+
+                  const minNights = packageSnapshot?.minNights ?? null
+                  const maxNights = packageSnapshot?.maxNights ?? null
+                  const originalDuration = bookingDuration ?? null
+
+                  if (minNights !== null && duration < minNights) {
+                    const durationText = minNights === 1 ? 'night' : 'nights'
+                    throw new Error(
+                      `⚠️ Duration mismatch: This package requires a minimum of ${minNights} ${durationText}. ` +
+                      `Your original booking was ${originalDuration ? `${originalDuration} ${originalDuration === 1 ? 'night' : 'nights'}` : 'for this package'}. ` +
+                      `Please select dates that match the package duration requirements.`
+                    )
+                  }
+
+                  if (maxNights !== null && duration > maxNights) {
+                    const durationText = maxNights === 1 ? 'night' : 'nights'
+                    throw new Error(
+                      `⚠️ Duration mismatch: This package allows a maximum of ${maxNights} ${durationText}. ` +
+                      `Your original booking was ${originalDuration ? `${originalDuration} ${originalDuration === 1 ? 'night' : 'nights'}` : 'for this package'}. ` +
+                      `Please select dates that match the package duration requirements.`
+                    )
+                  }
+
+                  const packageId = packageSnapshot.id
+                  const availabilityResponse = await fetch(
+                    `/api/bookings/check-availability?postId=${postId}&startDate=${dates.from.toISOString()}&endDate=${dates.to.toISOString()}&packageId=${packageId}`,
+                  )
+
+                  if (!availabilityResponse.ok) {
+                    throw new Error('Failed to check availability')
+                  }
+
+                  const availabilityData = await availabilityResponse.json()
+
+                  if (!availabilityData.isAvailable) {
+                    const suggestedDates = availabilityData.suggestedDates || []
+                    if (suggestedDates.length > 0) {
+                      throw new Error('The selected dates are not available for this package. Please see suggested dates below.')
+                    }
+                    throw new Error('The selected dates are not available for this package. Please choose different dates.')
+                  }
+
+                  const baseRate = packageSnapshot?.baseRate ??
+                    (typeof data?.post === 'object' && data.post?.baseRate != null && Number(data.post.baseRate) > 0
+                      ? Number(data.post.baseRate)
+                      : 150)
+
+                  const selectedPackage = data?.selectedPackage
+                  const packageBaseRate =
+                    selectedPackage && typeof selectedPackage.package === 'object' && selectedPackage.package?.baseRate != null && Number(selectedPackage.package.baseRate) > 0
+                      ? Number(selectedPackage.package.baseRate)
+                      : null
+
+                  const multiplier = packageSnapshot?.multiplier ?? 1
+                  const total = packageBaseRate
+                    ? packageBaseRate
+                    : calculateTotal(baseRate, duration, multiplier)
+
+                  const originalPackageType = packageSnapshot.id || data?.packageType
+
+                  if (!originalPackageType) {
+                    throw new Error('Original package type not found. Cannot reschedule.')
+                  }
+
+                  const resp = await fetch('/api/estimates', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      postId,
+                      fromDate: dates.from.toISOString(),
+                      toDate: dates.to.toISOString(),
+                      guests: [],
+                      title: `Reschedule estimate for ${typeof data?.post === 'object' ? data.post.title : 'Property'} - ${packageSnapshot?.minNights !== null && packageSnapshot?.minNights !== undefined && packageSnapshot.minNights <= 1 && duration === 1 ? 'hourly' : `${duration} ${duration === 1 ? 'night' : 'nights'}`}`,
+                      packageType: originalPackageType,
+                      total,
+                      originalBooking: data.id,
+                      selectedPackage: {
+                        package: packageSnapshot.id,
+                        customName: packageSnapshot.customName || packageSnapshot.name,
+                        enabled: true,
+                      },
+                    }),
+                  })
+
+                  if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}))
+                    throw new Error(err?.error || 'Failed to create estimate')
+                  }
+
+                  const created = await resp.json()
+                  router.push(`/estimate/${created.id}`)
+                } catch (error) {
+                  console.error('Error creating estimate:', error)
+                  setEstimateError(
+                    error instanceof Error ? error.message : 'Failed to create estimate. Please try again.',
+                  )
+                } finally {
+                  setIsSubmittingEstimate(false)
+                }
+              }}
+              isSubmittingEstimate={isSubmittingEstimate}
+              estimateError={estimateError}
+            />
+          </DialogContent>
+        </Dialog>
 
         {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-3">
@@ -1013,176 +1185,6 @@ export default function BookingDetailsClientPage({ data, user, isPreview }: Prop
               <Shield className="h-4 w-4" />
               <span>Payment secured and protected</span>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Cancellation Policy with Rescheduling */}
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold">Cancellation Policy</h3>
-              <Button variant="link" size="sm" className="gap-1 h-auto p-0">
-                View details
-                <ExternalLink className="h-3 w-3" />
-              </Button>
-            </div>
-            <p className="text-sm text-muted-foreground mb-4">
-              Use your tokens to reschedule your booking
-            </p>
-            
-            {/* Rescheduling Card */}
-            <div className="mt-4 pt-4 border-t">
-              <BookingInfoCard
-                variant="booking"
-                postUrl={typeof data?.post === 'object' && data.post ? `/posts/${data.post.slug || ''}` : undefined}
-                postId={typeof data?.post === 'string' ? data.post : (typeof data?.post === 'object' && data.post ? data.post.id : undefined)}
-                postTitle={typeof data?.post === 'object' && data.post ? data.post.title : undefined}
-                packageMinNights={packageSnapshot?.minNights ?? null}
-                packageMaxNights={packageSnapshot?.maxNights ?? null}
-                isReschedule={true}
-                originalBookingDates={data?.fromDate && data?.toDate ? {
-                  from: new Date(data.fromDate as string),
-                  to: new Date(data.toDate as string)
-                } : null}
-                onEstimateRequest={async (dates) => {
-                  setIsSubmittingEstimate(true)
-                  setEstimateError(null)
-
-                  try {
-                    const postId = typeof data?.post === 'string' ? data.post : data?.post?.id
-                    if (!postId) {
-                      throw new Error('No post ID found')
-                    }
-
-                    if (!packageSnapshot?.id) {
-                      throw new Error('Original booking package not found. Cannot reschedule.')
-                    }
-
-                    const fromDateObj = new Date(dates.from)
-                    const toDateObj = new Date(dates.to)
-                    const duration = Math.max(
-                      1,
-                      Math.round((toDateObj.getTime() - fromDateObj.getTime()) / (1000 * 60 * 60 * 24)),
-                    )
-
-                    const minNights = packageSnapshot?.minNights ?? null
-                    const maxNights = packageSnapshot?.maxNights ?? null
-                    const originalDuration = bookingDuration ?? null
-
-                    if (minNights !== null && duration < minNights) {
-                      const durationText = minNights === 1 ? 'night' : 'nights'
-                      throw new Error(
-                        `⚠️ Duration mismatch: This package requires a minimum of ${minNights} ${durationText}. ` +
-                        `Your original booking was ${originalDuration ? `${originalDuration} ${originalDuration === 1 ? 'night' : 'nights'}` : 'for this package'}. ` +
-                        `Please select dates that match the package duration requirements.`
-                      )
-                    }
-
-                    if (maxNights !== null && duration > maxNights) {
-                      const durationText = maxNights === 1 ? 'night' : 'nights'
-                      throw new Error(
-                        `⚠️ Duration mismatch: This package allows a maximum of ${maxNights} ${durationText}. ` +
-                        `Your original booking was ${originalDuration ? `${originalDuration} ${originalDuration === 1 ? 'night' : 'nights'}` : 'for this package'}. ` +
-                        `Please select dates that match the package duration requirements.`
-                      )
-                    }
-
-                    const packageId = packageSnapshot.id
-                    const availabilityResponse = await fetch(
-                      `/api/bookings/check-availability?postId=${postId}&startDate=${dates.from.toISOString()}&endDate=${dates.to.toISOString()}&packageId=${packageId}`,
-                    )
-
-                    if (!availabilityResponse.ok) {
-                      throw new Error('Failed to check availability')
-                    }
-
-                    const availabilityData = await availabilityResponse.json()
-
-                    if (!availabilityData.isAvailable) {
-                      const suggestedDates = availabilityData.suggestedDates || []
-                      if (suggestedDates.length > 0) {
-                        throw new Error('The selected dates are not available for this package. Please see suggested dates below.')
-                      }
-                      throw new Error('The selected dates are not available for this package. Please choose different dates.')
-                    }
-
-                    const baseRate = packageSnapshot?.baseRate ??
-                      (typeof data?.post === 'object' && data.post?.baseRate != null && Number(data.post.baseRate) > 0
-                        ? Number(data.post.baseRate)
-                        : 150)
-
-                    const selectedPackage = data?.selectedPackage
-                    const packageBaseRate =
-                      selectedPackage && typeof selectedPackage.package === 'object' && selectedPackage.package?.baseRate != null && Number(selectedPackage.package.baseRate) > 0
-                        ? Number(selectedPackage.package.baseRate)
-                        : null
-
-                    const multiplier = packageSnapshot?.multiplier ?? 1
-                    const total = packageBaseRate
-                      ? packageBaseRate
-                      : calculateTotal(baseRate, duration, multiplier)
-
-                    const originalPackageType = packageSnapshot.id || data?.packageType
-
-                    if (!originalPackageType) {
-                      throw new Error('Original package type not found. Cannot reschedule.')
-                    }
-
-                    const resp = await fetch('/api/estimates', {
-                      method: 'POST',
-                      credentials: 'include',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        postId,
-                        fromDate: dates.from.toISOString(),
-                        toDate: dates.to.toISOString(),
-                        guests: [],
-                        title: `Reschedule estimate for ${typeof data?.post === 'object' ? data.post.title : 'Property'} - ${packageSnapshot?.minNights !== null && packageSnapshot?.minNights !== undefined && packageSnapshot.minNights <= 1 && duration === 1 ? 'hourly' : `${duration} ${duration === 1 ? 'night' : 'nights'}`}`,
-                        packageType: originalPackageType,
-                        total,
-                        originalBooking: data.id,
-                        selectedPackage: {
-                          package: packageSnapshot.id,
-                          customName: packageSnapshot.customName || packageSnapshot.name,
-                          enabled: true,
-                        },
-                      }),
-                    })
-
-                    if (!resp.ok) {
-                      const err = await resp.json().catch(() => ({}))
-                      throw new Error(err?.error || 'Failed to create estimate')
-                    }
-
-                    const created = await resp.json()
-                    router.push(`/estimate/${created.id}`)
-                  } catch (error) {
-                    console.error('Error creating estimate:', error)
-                    setEstimateError(
-                      error instanceof Error ? error.message : 'Failed to create estimate. Please try again.',
-                    )
-                  } finally {
-                    setIsSubmittingEstimate(false)
-                  }
-                }}
-                isSubmittingEstimate={isSubmittingEstimate}
-                estimateError={estimateError}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Help Section */}
-        <Card className="bg-muted/50">
-          <CardContent className="p-6 text-center">
-            <h3 className="font-semibold mb-2">Need help?</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Our support team is available 24/7
-            </p>
-            <Button variant="outline" className="gap-2">
-              <MessageCircle className="h-4 w-4" />
-              Contact Support
-            </Button>
           </CardContent>
         </Card>
 
