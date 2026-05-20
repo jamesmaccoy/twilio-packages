@@ -55,11 +55,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${baseUrl}/login?error=google_email_missing`)
     }
 
+    const email = googleUser.email.toLowerCase()
+    const name = googleUser.name ?? email.split('@')[0] ?? email
+
     const existing = await payload.find({
       collection: 'users',
       where: {
         email: {
-          equals: googleUser.email.toLowerCase(),
+          equals: email,
         },
       },
       limit: 1,
@@ -70,9 +73,14 @@ export async function GET(request: NextRequest) {
     if (!user) {
       user = await payload.create({
         collection: 'users',
+        // Users collection doesn't use drafts, but Payload's create Options
+        // typing can require an explicit draft flag depending on config/types.
+        draft: false,
+        // This route runs unauthenticated; user creation is guarded by Google OAuth.
+        overrideAccess: true,
         data: {
-          email: googleUser.email.toLowerCase(),
-          name: googleUser.name || googleUser.email.split('@')[0],
+          email,
+          name,
           mobile: `+27${Math.floor(Math.random() * 900000000 + 100000000)}`,
           password: crypto.randomBytes(20).toString('hex'),
           role: 'customer',
