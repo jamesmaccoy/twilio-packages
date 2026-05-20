@@ -672,6 +672,9 @@ export default function EstimateDetailsClientPage({ data, user }: Props) {
           total: bookingTotal,
           paymentStatus: 'paid', // Mark as paid for subscribers
           customer: user.id,
+          guests: Array.isArray((data as any)?.guests)
+            ? (data as any).guests.map((g: any) => (typeof g === 'string' ? g : g?.id)).filter(Boolean)
+            : [],
         }
 
         // Include package information
