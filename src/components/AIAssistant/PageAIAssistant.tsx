@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
 import { PackagePreview } from '@/components/PackagePreview'
+import { FormattedAssistantContent } from '@/components/AIAssistant/FormattedAssistantContent'
 
 /** Editable template — matches manage chat “new listing” routing; user should edit title/description then click Generate. */
 const MANAGE_NEW_LISTING_PROMPT = `Create a new listing for my property.
@@ -820,7 +821,7 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
 
   const defaultPlaceholder = useMemo(() => {
     if (context?.type === 'account') {
-      return 'Ask about bookings, payments, features...'
+      return 'Ask about your lease stance, transactions, or purchased packages...'
     } else if (context?.type === 'manage') {
       return 'Ask about packages, statements, or management...'
     } else if (context?.type === 'bookings') {
@@ -882,20 +883,29 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
           <Button
             variant="outline"
             size="sm"
-            onClick={() => handleActionClick('Show my transaction history')}
+            onClick={() => handleActionClick('Where do I stand as a tenant vs my landlord under the lease?')}
             className="text-xs"
           >
-            <Calendar className="h-3 w-3 mr-1.5" />
-            Transactions
+            <FileText className="h-3 w-3 mr-1.5" />
+            Where do I stand?
           </Button>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => handleActionClick('What subscription features do I have?')}
+            onClick={() => handleActionClick('List my completed transactions with amounts and dates')}
+            className="text-xs"
+          >
+            <Calendar className="h-3 w-3 mr-1.5" />
+            My transactions
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleActionClick('What have I purchased from my host and what is included?')}
             className="text-xs"
           >
             <Package className="h-3 w-3 mr-1.5" />
-            My Features
+            What I purchased
           </Button>
         </div>
       )
@@ -1525,10 +1535,8 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
                     <Sparkles className="h-4 w-4 text-teal-600" />
                   </div>
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm text-slate-900 dark:text-foreground leading-relaxed whitespace-pre-line">
-                    {lastResponse}
-                  </p>
+                <div className="flex-1 min-w-0">
+                  <FormattedAssistantContent content={lastResponse} />
                 </div>
               </div>
             </div>
@@ -1833,17 +1841,15 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
 
       {/* Render simple response for other contexts */}
       {!isManageContext && lastResponse && (
-        <div className="rounded-lg border border-primary/20 bg-card p-4">
+        <div className="rounded-lg border border-primary/20 bg-card p-5">
           <div className="flex gap-3">
             <div className="flex-shrink-0">
               <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center shadow-sm">
                 <Sparkles className="h-4 w-4 text-primary-foreground" />
               </div>
             </div>
-            <div className="flex-1">
-              <p className="text-sm text-foreground leading-relaxed">
-                {lastResponse}
-              </p>
+            <div className="flex-1 min-w-0">
+              <FormattedAssistantContent content={lastResponse} />
             </div>
           </div>
         </div>

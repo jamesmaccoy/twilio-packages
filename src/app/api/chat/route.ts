@@ -407,9 +407,21 @@ ${JSON.stringify(transactionSummary, null, 2)}
 Purchased packages (host-provided, already purchased):
 ${JSON.stringify(purchasedSummary, null, 2)}
 
+FORMATTING (required — the UI renders Markdown):
+- Use ## for main section headings (e.g. ## Where you stand, ## What you've purchased).
+- Use ### for subsections when needed.
+- Put a blank line before and after every heading and list.
+- Use bullet lines starting with "- " for lists (not paragraphs).
+- For each completed transaction, use one bullet in this shape:
+  - **{packageName}** — {currency} {amount} · {status} · {date}
+- For each purchased package, use one bullet:
+  - **{title}** — {short description of what the host provides}
+- Use **bold** for role names (Tenant, Landlord/Host), package names, and amounts.
+- Keep paragraphs short; do not run bullets together in one paragraph.
+
 Answer the user's question in 2 parts:
-- Part A: "Where do I stand?" (tenant vs landlord obligations and rights, in plain language).
-- Part B: "What you've purchased" (map purchased packages to what the host provides; clearly state what is NOT included when relevant).`
+- Part A: ## Where you stand (tenant vs landlord obligations and rights, in plain language).
+- Part B: ## What you've purchased (map purchased packages to what the host provides; clearly state what is NOT included when relevant).`
 
       const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
       const chat = model.startChat({
