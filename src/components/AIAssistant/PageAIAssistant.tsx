@@ -1659,7 +1659,9 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
           <p className="text-base sm:text-lg leading-6 sm:leading-7 text-[#64748b] dark:text-muted-foreground m-0">
             {isBookingsContext
               ? "Ask about your upcoming trips, view booking details, or get recommendations."
-              : "Generate packages, analyze pricing, or get insights instantly."}
+              : manageContextPostId
+                ? "Generate packages, analyze pricing, or get insights instantly."
+                : "Draft a new plek with the assistant, or select a property from the sidebar to manage packages."}
           </p>
           {isManageContext && (
             <div className="flex flex-wrap justify-center gap-2 mt-6">
@@ -1671,7 +1673,7 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
                 onClick={() => applyManageQuickPrompt(MANAGE_NEW_LISTING_PROMPT)}
               >
                 <Home className="h-3.5 w-3.5 mr-1.5" />
-               Draft new plek
+                Draft new plek
               </Button>
             </div>
           )}

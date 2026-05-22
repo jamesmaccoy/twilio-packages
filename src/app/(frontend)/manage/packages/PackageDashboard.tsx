@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
-import { Loader2, RefreshCw, AlertCircle, Sparkles, Check, Star, Crown, Package, TrendingUp, DollarSign, Calendar, CheckCircle, Users, Clock, MoreHorizontal, Bot } from "lucide-react";
+import { Loader2, RefreshCw, AlertCircle, Sparkles, Check, Star, Crown, Package, TrendingUp, DollarSign, Calendar, CheckCircle, Users, Clock, MoreHorizontal, Bot, Home, Building2 } from "lucide-react";
 import { PackageOnboarding } from "@/components/PackageOnboarding/PackageOnboarding";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +49,40 @@ interface PackageDashboardProps {
   postId: string;
   /** If true, open the AI package onboarding immediately (create flow) */
   startOnboarding?: boolean;
+}
+
+/** Shown on /manage when the host has listings but none is selected in the sidebar. */
+export function ManageDashboardEmptyState({ propertyCount = 0 }: { propertyCount?: number }) {
+  return (
+    <div className="flex min-h-[min(520px,70vh)] items-center justify-center py-12">
+      <div className="w-full max-w-lg text-center bg-white dark:bg-card rounded-2xl border border-slate-200 dark:border-border shadow-sm px-8 py-12">
+        <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-50 dark:bg-teal-950/40">
+          <Home className="h-7 w-7 text-teal-600 dark:text-teal-400" />
+        </div>
+        <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-foreground mb-2">
+          Draft a new plek
+        </h2>
+        <p className="text-slate-500 dark:text-muted-foreground text-base leading-relaxed mb-8 max-w-md mx-auto">
+          {propertyCount > 0
+            ? 'Start a new listing, or pick a property from the sidebar to manage packages and pricing.'
+            : 'Create your first property listing, then add packages and guest details like WiFi and lockbox access.'}
+        </p>
+        <Link
+          href="/manage/properties/new"
+          className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-900 hover:bg-slate-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 px-6 py-3 text-sm font-medium transition-colors"
+        >
+          <Home className="h-4 w-4" />
+          Draft new plek
+        </Link>
+        {propertyCount > 0 ? (
+          <p className="mt-6 text-sm text-slate-400 dark:text-muted-foreground flex items-center justify-center gap-1.5">
+            <Building2 className="h-4 w-4 shrink-0" />
+            {propertyCount} {propertyCount === 1 ? 'property' : 'properties'} in your account
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 type DurationOption = { label: string; days: number }

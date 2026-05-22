@@ -1,12 +1,13 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
 import type { Post } from '@/payload-types'
 import { Sidebar, SidebarMenuButton } from './components/Sidebar'
 import { PropertyHeroEditor } from './components/PropertyHeroEditor'
 import { PageAIAssistant } from '@/components/AIAssistant/PageAIAssistant'
-import PackageDashboard from '@/app/(frontend)/manage/packages/PackageDashboard'
+import PackageDashboard, {
+  ManageDashboardEmptyState,
+} from '@/app/(frontend)/manage/packages/PackageDashboard'
 import AnnualStatementClient from '@/app/(frontend)/bookings/annual-statement/page.client'
 import { useUserContext } from '@/context/UserContext'
 import { LayoutDashboard, MessageSquare } from 'lucide-react'
@@ -35,7 +36,7 @@ export default function ManagePageClient({ posts, latestEstimatePostId }: Manage
 
   const [selectedPostId, setSelectedPostId] = useState<string | null>(() => {
     if (requestedPostId && posts.some((p) => p.id === requestedPostId)) return requestedPostId
-    return posts.length > 0 && posts[0] ? posts[0].id : null
+    return null
   })
 
   const replaceManageUrl = useCallback(
@@ -71,20 +72,14 @@ export default function ManagePageClient({ posts, latestEstimatePostId }: Manage
     setSelectedPostId(requestedPostId)
   }, [requestedPostId, postsState])
 
+  // Drop selection if the listing was removed; do not auto-select another property.
   useEffect(() => {
     setSelectedPostId((sel) => {
-      if (!sel) return postsState[0]?.id ?? null
+      if (!sel) return null
       if (postsState.some((p) => p.id === sel)) return sel
-      return postsState[0]?.id ?? null
+      return null
     })
   }, [postsState])
-
-  // Persist default selection in the URL so refresh restores the active property.
-  useEffect(() => {
-    if (!selectedPostId || requestedPostId === selectedPostId) return
-    if (!postsState.some((p) => p.id === selectedPostId)) return
-    replaceManageUrl(selectedPostId)
-  }, [selectedPostId, requestedPostId, postsState, replaceManageUrl])
 
   // New listing created from assistant → add to sidebar immediately and select it.
   useEffect(() => {
@@ -195,34 +190,22 @@ export default function ManagePageClient({ posts, latestEstimatePostId }: Manage
                 {/* Content based on active tab */}
                 {activeTab === 'packages' && (
                   <>
-                    {postsState.length === 0 ? (
-                      <div className="text-center py-16 bg-white dark:bg-card rounded-xl border border-slate-200 dark:border-border p-8">
-                        <div className="text-gray-500 dark:text-muted-foreground text-lg mb-4">
-                          You have no properties yet.
-                        </div>
-                        <Link 
-                          href="/manage/properties/new" 
-                          className="inline-block bg-slate-900 hover:bg-slate-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 px-6 py-3 rounded-lg transition"
-                        >
-                          Create your first property
-                        </Link>
-                      </div>
-                    ) : selectedPostId ? (
+                    {selectedPostId ? (
                       <>
                         <PropertyHeroEditor
                           postId={selectedPostId}
                           onListingDeleted={(id) => {
                             setPostsState((prev) => prev.filter((p) => p.id !== id))
+                            if (selectedPostId === id) {
+                              setSelectedPostId(null)
+                              replaceManageUrl(null)
+                            }
                           }}
                         />
                         <PackageDashboard postId={selectedPostId} startOnboarding={shouldStartOnboarding} />
                       </>
                     ) : (
-                      <div className="text-center py-16 bg-white dark:bg-card rounded-xl border border-slate-200 dark:border-border p-8">
-                        <div className="text-gray-500 dark:text-muted-foreground text-lg mb-4">
-                          Select a property from the sidebar to manage packages.
-                        </div>
-                      </div>
+                      <ManageDashboardEmptyState propertyCount={postsState.length} />
                     )}
                   </>
                 )}
