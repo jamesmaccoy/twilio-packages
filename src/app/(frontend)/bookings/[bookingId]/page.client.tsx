@@ -286,7 +286,9 @@ export default function BookingDetailsClientPage({ data, user, isPreview }: Prop
 
   const getBookingContext = React.useCallback(() => {
     const booking = data
-    const post = typeof booking?.post === 'string' ? null : booking?.post
+    const post = typeof booking?.post === 'object' && booking.post ? booking.post : null
+    const postId =
+      typeof booking?.post === 'string' ? booking.post : post?.id
 
     return {
       context: 'booking-details',
@@ -298,19 +300,19 @@ export default function BookingDetailsClientPage({ data, user, isPreview }: Prop
         paymentStatus: booking?.paymentStatus,
         createdAt: booking?.createdAt,
       },
-      property: post
+      property: postId
         ? {
-          id: post.id,
-          title: post.title,
-          description: post.meta?.description || '',
-          content: post.content,
-          baseRate: post.baseRate,
-          wifi: post.wifi || '',
-          lockbox: post.lockbox || '',
+          id: postId,
+          title: post?.title || booking?.title || '',
+          description: post?.meta?.description || '',
+          content: post?.content,
+          baseRate: post?.baseRate,
+          wifi: post?.wifi || '',
+          lockbox: post?.lockbox || '',
           houseManualUrl: HOUSE_MANUAL_URL,
-          relatedPosts: post.relatedPosts || [],
-          categories: Array.isArray(post.categories)
-            ? post.categories.map((c: any) => typeof c === 'object' ? c : c)
+          relatedPosts: post?.relatedPosts || [],
+          categories: Array.isArray(post?.categories)
+            ? post.categories.map((c: any) => (typeof c === 'object' ? c : c))
             : [],
         }
         : null,

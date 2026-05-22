@@ -444,11 +444,57 @@ Answer the user's question in 2 parts:
 
     if (context === 'booking-details' && pageData) {
       const booking = pageData.booking || {}
-      const property = pageData.property || {}
+      let property: Record<string, unknown> =
+        pageData.property && typeof pageData.property === 'object' ? { ...pageData.property } : {}
       const addons = Array.isArray(pageData.addons) ? pageData.addons : []
       const checkinInfo = Array.isArray(pageData.checkinInfo) ? pageData.checkinInfo : []
       const houseManualUrl =
         pageData.houseManualUrl || property.houseManualUrl || 'https://www.simpleplek.co.za/house-manual'
+
+      const postId =
+        (typeof property.id === 'string' && property.id) ||
+        (typeof booking.post === 'string' && booking.post) ||
+        (typeof booking.post === 'object' && booking.post?.id ? String(booking.post.id) : null)
+
+      if (postId && booking?.id) {
+        try {
+          const bookingDoc = await payload.findByID({
+            collection: 'bookings',
+            id: String(booking.id),
+            depth: 0,
+            select: { post: true, customer: true, guests: true },
+            user,
+          })
+          const customerId =
+            typeof bookingDoc.customer === 'string'
+              ? bookingDoc.customer
+              : bookingDoc.customer?.id
+          const guestIds = (bookingDoc.guests || [])
+            .map((g: unknown) => (typeof g === 'string' ? g : (g as { id?: string })?.id))
+            .filter(Boolean)
+          const canAccessBooking =
+            customerId === user.id || guestIds.includes(user.id)
+
+          if (canAccessBooking) {
+            const postDoc = await payload.findByID({
+              collection: 'posts',
+              id: postId,
+              depth: 0,
+              select: { title: true, wifi: true, lockbox: true },
+              user,
+            })
+            property = {
+              ...property,
+              id: postId,
+              title: property.title || postDoc.title,
+              wifi: postDoc.wifi ?? property.wifi ?? null,
+              lockbox: postDoc.lockbox ?? property.lockbox ?? null,
+            }
+          }
+        } catch (err) {
+          console.error('booking-details: failed to load post wifi/lockbox', err)
+        }
+      }
 
       const systemPrompt = `You are a booking assistant for a guest viewing THEIR ACTIVE BOOKING on SimplePlek (South Africa).
 
@@ -478,6 +524,7 @@ Check-in pages (if any):
 ${JSON.stringify(checkinInfo.slice(0, 5), null, 2)}
 
 Rules:
+- When wifi or lockbox values are present in the property JSON above, share them clearly with the guest (these are official host-provided details).
 - If WiFi or lockbox is null/empty, say the host has not added it yet and point them to the house manual: ${houseManualUrl}
 - Never invent WiFi passwords or lockbox codes.
 - Be practical and concise. You are not a lawyer.
