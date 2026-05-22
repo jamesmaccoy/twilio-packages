@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import type { Post } from '@/payload-types'
 import { Sidebar, SidebarMenuButton } from './components/Sidebar'
@@ -33,13 +33,43 @@ export default function ManagePageClient({ posts, latestEstimatePostId }: Manage
     return searchParams?.get('onboard') === '1'
   }, [searchParams])
 
-  const [selectedPostId, setSelectedPostId] = useState<string | null>(
-    requestedPostId || (posts.length > 0 && posts[0] ? posts[0].id : null)
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(() => {
+    if (requestedPostId && posts.some((p) => p.id === requestedPostId)) return requestedPostId
+    return posts.length > 0 && posts[0] ? posts[0].id : null
+  })
+
+  const replaceManageUrl = useCallback(
+    (postId: string | null) => {
+      const params = new URLSearchParams(searchParams?.toString() || '')
+      if (postId) {
+        params.set('postId', postId)
+      } else {
+        params.delete('postId')
+      }
+      const qs = params.toString()
+      router.replace(qs ? `/manage?${qs}` : '/manage', { scroll: false })
+    },
+    [router, searchParams],
+  )
+
+  const handleSelectProperty = useCallback(
+    (id: string) => {
+      setSelectedPostId(id)
+      replaceManageUrl(id)
+    },
+    [replaceManageUrl],
   )
 
   useEffect(() => {
     setPostsState(posts)
   }, [posts])
+
+  // Deep link: keep sidebar selection in sync when postId query changes (refresh, back/forward).
+  useEffect(() => {
+    if (!requestedPostId) return
+    if (!postsState.some((p) => p.id === requestedPostId)) return
+    setSelectedPostId(requestedPostId)
+  }, [requestedPostId, postsState])
 
   useEffect(() => {
     setSelectedPostId((sel) => {
@@ -48,6 +78,13 @@ export default function ManagePageClient({ posts, latestEstimatePostId }: Manage
       return postsState[0]?.id ?? null
     })
   }, [postsState])
+
+  // Persist default selection in the URL so refresh restores the active property.
+  useEffect(() => {
+    if (!selectedPostId || requestedPostId === selectedPostId) return
+    if (!postsState.some((p) => p.id === selectedPostId)) return
+    replaceManageUrl(selectedPostId)
+  }, [selectedPostId, requestedPostId, postsState, replaceManageUrl])
 
   // New listing created from assistant → add to sidebar immediately and select it.
   useEffect(() => {
@@ -65,12 +102,29 @@ export default function ManagePageClient({ posts, latestEstimatePostId }: Manage
         }
         return [normalized, ...prev]
       })
-      setSelectedPostId(newId)
+      handleSelectProperty(newId)
     }
 
     window.addEventListener('postCreated', handlePostCreated as EventListener)
     return () => window.removeEventListener('postCreated', handlePostCreated as EventListener)
-  }, [])
+  }, [handleSelectProperty])
+
+  const selectedProperty = useMemo(() => {
+    if (!selectedPostId) return null
+    const post = postsState.find((p) => p.id === selectedPostId)
+    if (!post) return null
+    const metaDesc =
+      typeof post.meta?.description === 'string' ? post.meta.description.trim() : ''
+    return {
+      id: post.id,
+      title: post.title,
+      description: metaDesc || null,
+      wifi: typeof post.wifi === 'string' && post.wifi.trim() ? post.wifi.trim() : null,
+      lockbox:
+        typeof post.lockbox === 'string' && post.lockbox.trim() ? post.lockbox.trim() : null,
+    }
+  }, [postsState, selectedPostId])
+
   const [activeTab, setActiveTab] = useState<'packages' | 'statement'>('packages')
   const [mobileView, setMobileView] = useState<'dashboard' | 'assistant'>('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -121,7 +175,7 @@ export default function ManagePageClient({ posts, latestEstimatePostId }: Manage
           {/* Sidebar */}
           <Sidebar
             activeProperty={selectedPostId}
-            onSelectProperty={setSelectedPostId}
+            onSelectProperty={handleSelectProperty}
             properties={postsState}
             activeTab={activeTab}
             onSelectTab={setActiveTab}
@@ -193,6 +247,7 @@ export default function ManagePageClient({ posts, latestEstimatePostId }: Manage
                         posts: postsState,
                         latestEstimatePostId,
                         postId: selectedPostId,
+                        selectedProperty,
                       },
                     }}
                     variant="primary"

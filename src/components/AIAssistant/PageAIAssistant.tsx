@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { Sparkles, ArrowUpIcon, Mic, Loader2, Package, Calendar, TrendingUp, Home, Star, FileText, BarChart2, Eye, ExternalLink } from 'lucide-react'
+import { Sparkles, ArrowUpIcon, Mic, Loader2, Package, Calendar, TrendingUp, Home, Star, FileText, BarChart2, Eye, ExternalLink, Wifi, KeyRound } from 'lucide-react'
 import {
   InputGroup,
   InputGroupTextarea,
@@ -27,6 +27,66 @@ Title: My guest stay (edit this title)
 Description: Brief guest-facing summary — space, location, amenities, and who it is for. (edit this paragraph)
 
 Save the listing as a draft only. After it is created, ask me the package placement questions (add-on vs stay, non-member specials, hosted) before suggesting any packages.`
+
+type ManagePropertyBrief = {
+  id: string
+  title: string
+  description: string | null
+  wifi: string | null
+  lockbox: string | null
+}
+
+function propertyBriefFromContext(data: any, postId: string): ManagePropertyBrief | null {
+  const fromSelected = data?.selectedProperty
+  if (fromSelected?.id === postId && typeof fromSelected.title === 'string') {
+    return {
+      id: postId,
+      title: fromSelected.title,
+      description:
+        typeof fromSelected.description === 'string' && fromSelected.description.trim()
+          ? fromSelected.description.trim()
+          : null,
+      wifi:
+        typeof fromSelected.wifi === 'string' && fromSelected.wifi.trim()
+          ? fromSelected.wifi.trim()
+          : null,
+      lockbox:
+        typeof fromSelected.lockbox === 'string' && fromSelected.lockbox.trim()
+          ? fromSelected.lockbox.trim()
+          : null,
+    }
+  }
+  const post = Array.isArray(data?.posts)
+    ? data.posts.find((p: any) => p?.id === postId)
+    : null
+  if (!post || typeof post.title !== 'string') return null
+  const metaDesc =
+    typeof post.meta?.description === 'string' ? post.meta.description.trim() : ''
+  return {
+    id: postId,
+    title: post.title,
+    description: metaDesc || null,
+    wifi: typeof post.wifi === 'string' && post.wifi.trim() ? post.wifi.trim() : null,
+    lockbox:
+      typeof post.lockbox === 'string' && post.lockbox.trim() ? post.lockbox.trim() : null,
+  }
+}
+
+function propertyBriefFromApiDoc(doc: any, postId: string): ManagePropertyBrief | null {
+  if (!doc || typeof doc.title !== 'string') return null
+  const metaDesc =
+    typeof doc.meta?.description === 'string' ? doc.meta.description.trim() : ''
+  const rootText = doc?.content?.root?.children?.[0]?.children?.[0]?.text
+  const bodySnippet = typeof rootText === 'string' ? rootText.trim() : ''
+  return {
+    id: postId,
+    title: doc.title,
+    description: metaDesc || bodySnippet || null,
+    wifi: typeof doc.wifi === 'string' && doc.wifi.trim() ? doc.wifi.trim() : null,
+    lockbox:
+      typeof doc.lockbox === 'string' && doc.lockbox.trim() ? doc.lockbox.trim() : null,
+  }
+}
 
 function catalogRecPlacementLabel(r: {
   details?: { category?: string; customerTierRequired?: string }
@@ -122,6 +182,8 @@ export function PageAIAssistant({ context, placeholder, className, showActions =
   const postCreatedDispatchedRef = useRef<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const recognitionRef = useRef<any>(null)
+  const [managePropertyBrief, setManagePropertyBrief] = useState<ManagePropertyBrief | null>(null)
+  const [managePropertyBriefLoading, setManagePropertyBriefLoading] = useState(false)
 
   const userRole = useMemo(() =>
     Array.isArray(currentUser?.role) ? currentUser?.role : [currentUser?.role].filter(Boolean),
@@ -162,16 +224,65 @@ export function PageAIAssistant({ context, placeholder, className, showActions =
     })
   }
 
+  const managePageData = useMemo(() => {
+    const base = context?.data || {}
+    if (!managePropertyBrief || managePropertyBrief.id !== base.postId) return base
+    return {
+      ...base,
+      selectedProperty: managePropertyBrief,
+    }
+  }, [context?.data, managePropertyBrief])
+
   const manageTransport = useMemo(
     () =>
       new DefaultChatTransport({
         api: '/api/chat/manage',
         body: {
-          pageData: context?.data || {},
+          pageData: managePageData,
         },
       }),
-    [context?.data],
+    [managePageData],
   )
+
+  const manageContextPostId = useMemo(() => {
+    if (!isManageContext) return ''
+    return String(context?.data?.postId || '').trim()
+  }, [isManageContext, context?.data?.postId])
+
+  useEffect(() => {
+    if (!isManageContext || !manageContextPostId) {
+      setManagePropertyBrief(null)
+      setManagePropertyBriefLoading(false)
+      return
+    }
+
+    const cached = propertyBriefFromContext(context?.data, manageContextPostId)
+    if (cached) setManagePropertyBrief(cached)
+
+    let cancelled = false
+    setManagePropertyBriefLoading(true)
+
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/posts/${encodeURIComponent(manageContextPostId)}`, {
+          credentials: 'include',
+        })
+        if (!res.ok) throw new Error('Failed to load property')
+        const json = await res.json()
+        if (cancelled) return
+        const brief = propertyBriefFromApiDoc(json?.doc, manageContextPostId)
+        if (brief) setManagePropertyBrief(brief)
+      } catch {
+        if (!cancelled && cached) setManagePropertyBrief(cached)
+      } finally {
+        if (!cancelled) setManagePropertyBriefLoading(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [isManageContext, manageContextPostId, context?.data])
 
   const chatHook = useChat({
     // AI SDK React v3 uses transport instead of top-level `api`.
@@ -817,6 +928,59 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
         partsCount: m.parts?.length || 0,
       })))
     }
+  }
+
+  const renderManagePropertyContext = () => {
+    if (!isManageContext || !manageContextPostId) return null
+    if (managePropertyBriefLoading && !managePropertyBrief) {
+      return (
+        <div className="mt-6 mx-auto max-w-lg rounded-xl border border-[#e2e8f0] dark:border-border bg-[#f8fafc] dark:bg-muted/40 px-4 py-3 text-sm text-[#64748b] dark:text-muted-foreground text-left">
+          Loading property details…
+        </div>
+      )
+    }
+    if (!managePropertyBrief) return null
+    return (
+      <div className="mt-6 mx-auto max-w-lg rounded-xl border border-[#e2e8f0] dark:border-border bg-[#f8fafc] dark:bg-muted/40 px-4 py-4 text-left">
+        <p className="text-xs font-semibold uppercase tracking-wider text-[#64748b] dark:text-muted-foreground mb-1">
+          Selected property
+        </p>
+        <p className="text-sm font-semibold text-[#0f172a] dark:text-foreground mb-2">
+          {managePropertyBrief.title}
+        </p>
+        {managePropertyBrief.description ? (
+          <p className="text-sm leading-5 text-[#475569] dark:text-muted-foreground mb-3">
+            {managePropertyBrief.description}
+          </p>
+        ) : (
+          <p className="text-sm text-[#94a3b8] dark:text-muted-foreground mb-3">
+            No description on file yet.
+          </p>
+        )}
+        <div className="space-y-2 text-sm text-[#475569] dark:text-muted-foreground">
+          <div className="flex gap-2 items-start">
+            <Wifi className="h-4 w-4 shrink-0 text-teal-600 mt-0.5" />
+            <span>
+              {managePropertyBrief.wifi ? (
+                <span className="whitespace-pre-wrap">{managePropertyBrief.wifi}</span>
+              ) : (
+                <span className="text-[#94a3b8]">WiFi not set</span>
+              )}
+            </span>
+          </div>
+          <div className="flex gap-2 items-start">
+            <KeyRound className="h-4 w-4 shrink-0 text-teal-600 mt-0.5" />
+            <span>
+              {managePropertyBrief.lockbox ? (
+                <span className="whitespace-pre-wrap">{managePropertyBrief.lockbox}</span>
+              ) : (
+                <span className="text-[#94a3b8]">Lockbox not set</span>
+              )}
+            </span>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const defaultPlaceholder = useMemo(() => {
@@ -1511,6 +1675,7 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
               </Button>
             </div>
           )}
+          {renderManagePropertyContext()}
         </div>
 
         {/* Messages Area */}

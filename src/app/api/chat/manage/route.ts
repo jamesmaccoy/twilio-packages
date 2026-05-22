@@ -1071,6 +1071,32 @@ export async function POST(request: NextRequest) {
       disabled: existingPackages.docs.filter((pkg: any) => !pkg.isEnabled).length,
     }
 
+    const selectedPropertyContext = (() => {
+      if (!selectedPostId || !postDetails) return ''
+      const title = typeof postDetails.title === 'string' ? postDetails.title.trim() : 'Untitled'
+      const metaDesc =
+        typeof postDetails.meta?.description === 'string'
+          ? postDetails.meta.description.trim()
+          : ''
+      const bodySnippet = extractLexicalFirstParagraph(postDetails.content)
+      const description = metaDesc || bodySnippet || 'No description on file'
+      const wifi =
+        typeof postDetails.wifi === 'string' && postDetails.wifi.trim()
+          ? postDetails.wifi.trim()
+          : null
+      const lockbox =
+        typeof postDetails.lockbox === 'string' && postDetails.lockbox.trim()
+          ? postDetails.lockbox.trim()
+          : null
+      return `
+SELECTED LISTING (sidebar / deep link postId=${selectedPostId}):
+- Title: ${title}
+- Description: ${description}
+- WiFi: ${wifi ? wifi : 'Not set — ask the host to add network + password in property settings'}
+- Lockbox: ${lockbox ? lockbox : 'Not set — ask the host to add key-safe / smart-lock instructions in property settings'}
+Use these official host-provided details when suggesting packages, house-manual copy, or guest check-in answers. Never invent WiFi passwords or lockbox codes.`
+    })()
+
     const systemPrompt = `You are an AI assistant helping a host manage their properties and packages.
 
 🏠 NEW LISTING / PROPERTY FIRST (overrides generic “jump straight to package preview”):
@@ -1110,6 +1136,7 @@ AFTER TOOL CALLS:
 
 HOST'S PROPERTIES:
 ${posts.map((post: any) => `- ${post.title} (ID: ${post.id}, Slug: ${post.slug})`).join('\n') || 'No properties yet'}
+${selectedPropertyContext}
 
 PACKAGE STATISTICS:
 - Total Packages: ${packageStats.total}
