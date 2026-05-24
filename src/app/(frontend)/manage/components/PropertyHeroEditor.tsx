@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import type { Media } from "@/payload-types"
+import { compressImageForUpload } from "@/lib/clientImageCompression"
 
 type PropertyHeroEditorProps = {
   postId: string
@@ -26,8 +27,9 @@ type PropertyHeroEditorProps = {
 }
 
 async function uploadMedia(file: File, alt: string): Promise<string> {
+  const safeFile = await compressImageForUpload(file, { maxBytes: 3_500_000, maxDimension: 1800 })
   const fd = new FormData()
-  fd.append("file", file)
+  fd.append("file", safeFile)
   fd.append(
     "_payload",
     JSON.stringify({
@@ -42,6 +44,9 @@ async function uploadMedia(file: File, alt: string): Promise<string> {
   })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
+    if (res.status === 413) {
+      throw new Error("That photo is too large to upload. Please choose a smaller image or screenshot it first.")
+    }
     const msg =
       (typeof data?.message === "string" && data.message) ||
       data?.errors?.[0]?.message ||

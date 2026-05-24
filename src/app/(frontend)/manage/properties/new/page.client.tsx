@@ -9,10 +9,12 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Loader2, ArrowRight, ImagePlus, X } from 'lucide-react'
+import { compressImageForUpload } from '@/lib/clientImageCompression'
 
 async function uploadHeroMedia(file: File, alt: string): Promise<string> {
+  const safeFile = await compressImageForUpload(file, { maxBytes: 3_500_000, maxDimension: 1800 })
   const fd = new FormData()
-  fd.append('file', file)
+  fd.append('file', safeFile)
   fd.append(
     '_payload',
     JSON.stringify({
@@ -31,6 +33,9 @@ async function uploadHeroMedia(file: File, alt: string): Promise<string> {
       data?.errors?.[0]?.message ||
       data?.error ||
       'Image upload failed'
+    if (res.status === 413) {
+      throw new Error('That photo is too large to upload. Please choose a smaller image or screenshot it first.')
+    }
     throw new Error(msg)
   }
   const id = data?.doc?.id ?? data?.id
