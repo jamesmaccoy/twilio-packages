@@ -7,12 +7,15 @@ import {
   type PackagePlacementAnswers,
 } from '@/lib/package-placement'
 import { cn } from '@/lib/utils'
+import { ChevronLeft } from 'lucide-react'
 
 type AnswerKey = keyof PackagePlacementAnswers
 
 type QuizState = Record<AnswerKey, boolean | null>
 
-function allAnswered(state: QuizState): state is PackagePlacementAnswers {
+const STEP_COUNT = PACKAGE_PLACEMENT_QUIZ_ITEMS.length
+
+function isComplete(state: QuizState): state is PackagePlacementAnswers {
   return (
     state.hostInvolved !== null &&
     state.runSpecial !== null &&
@@ -32,6 +35,7 @@ export function PackagePlacementQuiz({
   disabled?: boolean
   className?: string
 }) {
+  const [step, setStep] = useState(0)
   const [answers, setAnswers] = useState<QuizState>({
     hostInvolved: null,
     runSpecial: null,
@@ -39,8 +43,25 @@ export function PackagePlacementQuiz({
     onceOff: null,
   })
 
-  const setAnswer = (key: AnswerKey, value: boolean) => {
-    setAnswers((prev) => ({ ...prev, [key]: value }))
+  const item = PACKAGE_PLACEMENT_QUIZ_ITEMS[step]
+  const isLastStep = step === STEP_COUNT - 1
+
+  const choose = (value: boolean) => {
+    if (disabled) return
+    const nextAnswers: QuizState = { ...answers, [item.id]: value }
+    setAnswers(nextAnswers)
+
+    if (isLastStep && isComplete(nextAnswers)) {
+      onComplete(nextAnswers)
+      return
+    }
+    if (!isLastStep) {
+      setStep((s) => Math.min(s + 1, STEP_COUNT - 1))
+    }
+  }
+
+  const goBack = () => {
+    if (step > 0) setStep((s) => s - 1)
   }
 
   return (
@@ -50,74 +71,89 @@ export function PackagePlacementQuiz({
         className,
       )}
     >
-      <div>
-        <p className="font-medium text-teal-950 dark:text-teal-100">
-          A few quick questions
-        </p>
-        {propertyTitle ? (
-          <p className="text-xs text-slate-600 dark:text-muted-foreground mt-0.5">
-            For <span className="font-medium">{propertyTitle}</span> — tap Yes or No for each.
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-medium text-teal-950 dark:text-teal-100">
+            Quick question {step + 1} of {STEP_COUNT}
           </p>
-        ) : (
-          <p className="text-xs text-slate-600 dark:text-muted-foreground mt-0.5">
-            Tap Yes or No for each so we can suggest the right packages.
-          </p>
-        )}
+          {propertyTitle ? (
+            <p className="text-xs text-slate-600 dark:text-muted-foreground mt-0.5">
+              For <span className="font-medium">{propertyTitle}</span>
+            </p>
+          ) : (
+            <p className="text-xs text-slate-600 dark:text-muted-foreground mt-0.5">
+              Tap Yes or No to continue.
+            </p>
+          )}
+        </div>
+        {step > 0 ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={disabled}
+            className="shrink-0 h-8 px-2 text-slate-600"
+            onClick={goBack}
+          >
+            <ChevronLeft className="h-4 w-4 mr-0.5" />
+            Back
+          </Button>
+        ) : null}
       </div>
 
-      <ul className="space-y-4">
-        {PACKAGE_PLACEMENT_QUIZ_ITEMS.map((item) => {
-          const value = answers[item.id]
-          return (
-            <li key={item.id} className="rounded-md border border-white/80 bg-white dark:bg-card dark:border-border p-3 shadow-sm">
-              <p className="font-medium text-slate-900 dark:text-foreground text-sm leading-snug">
-                {item.question}
-              </p>
-              <p className="text-xs text-slate-500 dark:text-muted-foreground mt-1">{item.help}</p>
-              <div className="flex flex-wrap gap-2 mt-3">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={value === true ? 'default' : 'outline'}
-                  disabled={disabled}
-                  className={cn(
-                    'rounded-full min-w-[4.5rem]',
-                    value === true && 'bg-teal-700 hover:bg-teal-800 text-white',
-                  )}
-                  onClick={() => setAnswer(item.id, true)}
-                >
-                  {item.yesLabel}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={value === false ? 'default' : 'outline'}
-                  disabled={disabled}
-                  className={cn(
-                    'rounded-full min-w-[4.5rem]',
-                    value === false && 'bg-slate-700 hover:bg-slate-800 text-white',
-                  )}
-                  onClick={() => setAnswer(item.id, false)}
-                >
-                  {item.noLabel}
-                </Button>
-              </div>
-            </li>
-          )
-        })}
-      </ul>
-
-      <Button
-        type="button"
-        className="w-full rounded-full bg-[#0f172a] hover:bg-[#1e293b] text-white"
-        disabled={disabled || !allAnswered(answers)}
-        onClick={() => {
-          if (!allAnswered(answers)) return
-          onComplete(answers)
-        }}
+      <div
+        className="flex gap-1.5"
+        role="progressbar"
+        aria-valuenow={step + 1}
+        aria-valuemin={1}
+        aria-valuemax={STEP_COUNT}
+        aria-label={`Question ${step + 1} of ${STEP_COUNT}`}
       >
-        Suggest packages
-      </Button>
+        {PACKAGE_PLACEMENT_QUIZ_ITEMS.map((q, i) => (
+          <div
+            key={q.id}
+            className={cn(
+              'h-1 flex-1 rounded-full transition-colors',
+              i <= step ? 'bg-teal-600' : 'bg-teal-200/80 dark:bg-teal-900/60',
+            )}
+          />
+        ))}
+      </div>
+
+      <div className="rounded-md border border-white/80 bg-white dark:bg-card dark:border-border p-4 shadow-sm">
+        <p className="font-medium text-slate-900 dark:text-foreground text-base leading-snug">
+          {item.question}
+        </p>
+        <p className="text-xs text-slate-500 dark:text-muted-foreground mt-2">{item.help}</p>
+        <div className="flex flex-wrap gap-2 mt-4">
+          <Button
+            type="button"
+            size="default"
+            variant="outline"
+            disabled={disabled}
+            className="rounded-full min-w-[5rem] flex-1 sm:flex-none border-teal-200 hover:bg-teal-50 dark:hover:bg-teal-950/30"
+            onClick={() => choose(true)}
+          >
+            {item.yesLabel}
+          </Button>
+          <Button
+            type="button"
+            size="default"
+            variant="outline"
+            disabled={disabled}
+            className="rounded-full min-w-[5rem] flex-1 sm:flex-none"
+            onClick={() => choose(false)}
+          >
+            {item.noLabel}
+          </Button>
+        </div>
+      </div>
+
+      {isLastStep ? (
+        <p className="text-xs text-center text-slate-500 dark:text-muted-foreground">
+          Your next tap will suggest packages for this listing.
+        </p>
+      ) : null}
     </div>
   )
 }
