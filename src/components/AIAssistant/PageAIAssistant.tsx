@@ -19,14 +19,19 @@ import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
 import { PackagePreview } from '@/components/PackagePreview'
 import { FormattedAssistantContent } from '@/components/AIAssistant/FormattedAssistantContent'
+import { PackagePlacementQuiz } from '@/components/AIAssistant/PackagePlacementQuiz'
+import {
+  buildSuggestPackagesMessage,
+  type PackagePlacementAnswers,
+} from '@/lib/package-placement'
 
-/** Editable template — matches manage chat “new listing” routing; user should edit title/description then click Generate. */
+/** Editable template — matches manage chat “new listing” routing; user should edit title/description then send. */
 const MANAGE_NEW_LISTING_PROMPT = `Create a new listing for my property.
 
 Title: My guest stay (edit this title)
 Description: Brief guest-facing summary — space, location, amenities, and who it is for. (edit this paragraph)
 
-Save the listing as a draft only. After it is created, ask me the package placement questions (add-on vs stay, non-member specials, hosted) before suggesting any packages.`
+Save the listing as a draft only.`
 
 type ManagePropertyBrief = {
   id: string
@@ -180,6 +185,11 @@ export function PageAIAssistant({ context, placeholder, className, showActions =
   const [restoredEstimate, setRestoredEstimate] = useState<any>(null)
   const estimateRestoredRef = useRef(false)
   const postCreatedDispatchedRef = useRef<string | null>(null)
+  const placementQuizCompletedRef = useRef<Set<string>>(new Set())
+  const [generatePackagesQuiz, setGeneratePackagesQuiz] = useState<{
+    postId: string
+    title?: string
+  } | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const recognitionRef = useRef<any>(null)
   const [managePropertyBrief, setManagePropertyBrief] = useState<ManagePropertyBrief | null>(null)
@@ -860,6 +870,21 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
     })
   }, [])
 
+  const submitPlacementQuiz = useCallback(
+    async (postId: string, answers: PackagePlacementAnswers) => {
+      if (!sendMessage) return
+      placementQuizCompletedRef.current.add(postId)
+      setGeneratePackagesQuiz(null)
+      try {
+        await sendMessage({ text: buildSuggestPackagesMessage(postId, answers) })
+      } catch (error) {
+        console.error('Error submitting placement quiz:', error)
+        placementQuizCompletedRef.current.delete(postId)
+      }
+    },
+    [sendMessage],
+  )
+
   const handleActionClick = async (action: string) => {
     if (process.env.NODE_ENV === 'development') {
       console.log('🔘 Action button clicked:', { action, isManageContext, hasSendMessage: !!sendMessage, status })
@@ -1314,6 +1339,21 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
                                 </div>
                               )}
                             </div>
+                            {part.output.success &&
+                              part.output.post?.id &&
+                              (part.output.needsPlacementQuiz !== false ||
+                                recs.length === 0) &&
+                              !placementQuizCompletedRef.current.has(
+                                String(part.output.post.id),
+                              ) && (
+                                <PackagePlacementQuiz
+                                  propertyTitle={part.output.post.title}
+                                  disabled={chatIsLoading || isApprovingSuggestions}
+                                  onComplete={(answers) =>
+                                    void submitPlacementQuiz(String(part.output.post.id), answers)
+                                  }
+                                />
+                              )}
                             {part.output.success && recs.length > 0 && (
                               <div className="rounded-lg border border-teal-200 bg-teal-50/60 p-4 text-sm">
                                 <div className="flex items-start justify-between gap-3 mb-3">
@@ -1913,6 +1953,25 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
           </form>
         </div>
 
+        {isManageContext && generatePackagesQuiz ? (
+          <div className="max-w-2xl mx-auto w-full mb-4 px-1">
+            <PackagePlacementQuiz
+              propertyTitle={generatePackagesQuiz.title}
+              disabled={chatIsLoading || isApprovingSuggestions}
+              onComplete={(answers) =>
+                void submitPlacementQuiz(generatePackagesQuiz.postId, answers)
+              }
+            />
+            <button
+              type="button"
+              className="mt-2 text-xs text-slate-500 hover:text-slate-700 underline"
+              onClick={() => setGeneratePackagesQuiz(null)}
+            >
+              Cancel
+            </button>
+          </div>
+        ) : null}
+
         {/* Quick Action Buttons */}
         {isManageContext ? (
           <div className="flex flex-wrap items-center justify-center gap-3">
@@ -1933,11 +1992,12 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
                   handleActionClick('Create a new package for my property')
                   return
                 }
-                handleActionClick(
-                  `For postId "${pid}": ask the package placement questions first (add-on vs stay, non-member specials, hosted) if you do not know my answers yet. Then CALL suggestCatalogPackages with a hint that includes my placement preferences. Return 1–4 catalog ideas so I can approve them.`,
-                )
+                const title =
+                  managePropertyBrief?.title ||
+                  context?.data?.posts?.find((p: any) => p?.id === pid)?.title
+                setGeneratePackagesQuiz({ postId: pid, title })
               }}
-              disabled={chatIsLoading}
+              disabled={chatIsLoading || !!generatePackagesQuiz}
               className="text-sm font-medium leading-5 text-[#475569] dark:text-foreground bg-white dark:bg-card cursor-pointer flex items-center gap-2 shadow-[0_0_0_0_transparent,0_0_0_0_transparent,0_1px_2px_0_rgba(0,0,0,0.05)] transition-all duration-200 border border-[#e2e8f0] dark:border-border rounded-full px-4 py-2 hover:bg-[#f8fafc] dark:hover:bg-muted hover:border-[#cbd5e1] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Package className="h-4 w-4" />

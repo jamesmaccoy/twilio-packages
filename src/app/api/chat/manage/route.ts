@@ -6,6 +6,7 @@ import { getPayload } from 'payload'
 import configPromise from '@/payload.config'
 import { z } from 'zod'
 import { BASE_PACKAGE_TEMPLATES, getDefaultPackageTitle } from '@/lib/package-types'
+import { applyPlacementOverrides } from '@/lib/package-placement'
 import { sendPackageActivityNotification } from '@/lib/emailNotifications'
 
 // Zod schemas to validate structured JSON that is streamed to the UI
@@ -74,40 +75,6 @@ const catalogSuggestionSchema = z.object({
     .min(1)
     .max(4),
 })
-
-/** Shown after createPost and before catalog/preview tools on new listings */
-export const PACKAGE_PLACEMENT_QUESTIONS = `Before I suggest packages, a few quick questions so guests see the right offers:
-
-1. **Repeat add-on or stay package?** — Extras like cleaning or tours are usually **add-on** (one-off). Nightly or weekly stays are **standard** or **special**.
-2. **Offer a deal to guests without a subscription?** — Yes → often **special** with **non-member** visibility. Member-only deals stay on **standard** entitlement.
-3. **Hosted experience?** — Yes → **hosted** (you or staff involved during the stay).
-
-Reply in your own words (e.g. "weekly stay, special for non-members, not hosted") and I'll match packages.`
-
-function applyPlacementOverrides(
-  recommendations: z.infer<typeof catalogSuggestionSchema>['recommendations'],
-  hint?: string,
-) {
-  if (!hint?.trim()) return recommendations
-  const h = hint.toLowerCase()
-  const wantsNonMember =
-    /non-?member|without (a )?subscription|guests without|unsubscribed|not subscribed|public (offer|deal)|anyone can (book|see)/.test(
-      h,
-    )
-  const wantsHosted = /\bhosted\b|concierge|host (will |is )?involv|personalized service/.test(h)
-  const wantsAddon =
-    /\baddon\b|add-?on|once[- ]?off|one[- ]?time|cleaning|tour|extra service|not (a )?stay|repeat service/.test(h)
-  const wantsSpecial = /\bspecial\b|promo|promotion|limited[- ]?time|deal for/.test(h)
-
-  return recommendations.map((r) => {
-    const details = { ...(r as any).details } as Record<string, unknown>
-    if (wantsNonMember) details.customerTierRequired = 'none'
-    if (wantsHosted) details.category = 'hosted'
-    if (wantsAddon) details.category = 'addon'
-    if (wantsSpecial && wantsNonMember) details.category = 'special'
-    return { ...r, details }
-  })
-}
 
 function fallbackCatalogBaseRateRands(category: string, minNights: number) {
   const c = String(category || 'standard')
@@ -399,7 +366,7 @@ export async function POST(request: NextRequest) {
     // @ts-ignore - AI SDK tool type inference issue
     const previewPackageTool = tool({
       description:
-        'Preview a package before creating it. Shows a mock package card with all details. For NEW listings, ask package placement questions first (see system prompt) unless the user already answered. When the user gives package details (name, price, category intent), call immediately with category and entitlement from their answers: addon = repeat/once-off extras, hosted = hosted stay, special + entitlement none = non-member deals, standard = member stays. Guess missing baseRate/features/nights from category defaults.',
+        'Preview a package before creating it. Shows a mock package card with all details. For NEW listings, wait until the host completes the yes/no placement quiz in the UI (or sends Host package preferences) unless they already answered. Map answers: host involved → hosted; run special → special; exclusive → pro entitlement; public/open → entitlement none; once-off → addon. Guess missing baseRate/features/nights from category defaults.',
       parameters: z.object({
         name: z.string().optional().describe('Package display name (include emoji if appropriate). If not provided, generate based on category and description.'),
         description: z.string().optional().describe('Detailed description of what the package offers. If not provided, generate based on category.'),
@@ -892,7 +859,7 @@ export async function POST(request: NextRequest) {
     // @ts-ignore - AI SDK tool type inference issue
     const createPostTool = tool({
       description:
-        'Create a new property (post) for the host. Does NOT auto-suggest packages. After success, ask the package placement questions in text, then call suggestCatalogPackages or previewPackage once the host answers.',
+        'Create a new property (post) for the host. Does NOT auto-suggest packages. After success the UI shows a yes/no placement quiz — do NOT paste long question lists in chat. Call suggestCatalogPackages when the host submits quiz answers or sends "CALL suggestCatalogPackages NOW" with a hint.',
       parameters: z.object({
         title: z.string().describe('Property title/name (e.g., "Beachfront Studio", "Mountain Cabin")'),
         description: z.string().optional().describe('Property description. If not provided, will generate based on title.'),
@@ -995,8 +962,6 @@ export async function POST(request: NextRequest) {
 
           console.log('Post created successfully:', created.id)
 
-          const message = `"${title}" is saved as a draft.\n\n${PACKAGE_PLACEMENT_QUESTIONS}`
-
           return {
             success: true,
             post: {
@@ -1007,7 +972,8 @@ export async function POST(request: NextRequest) {
               status: created._status,
             },
             recommendations: [],
-            message,
+            needsPlacementQuiz: true,
+            message: `"${title}" is saved as a draft. Answer the quick questions below and we'll suggest packages.`,
           }
         } catch (error: any) {
           console.error('Error creating post:', error)
@@ -1023,14 +989,14 @@ export async function POST(request: NextRequest) {
     // @ts-ignore - AI SDK tool type inference issue
     const suggestCatalogPackagesForPostTool = tool({
       description:
-        'Suggest 1–4 packages from the fixed catalog for a property. Call ONLY after package placement questions are answered (add-on vs stay, non-member specials, hosted) — pass those answers in hint. Use when the user wants starter ideas or after a new listing + placement Q&A.',
+        'Suggest 1–4 packages from the fixed catalog for a property. Call after the host completes the yes/no placement quiz or includes Host package preferences / CALL suggestCatalogPackages in their message — pass those answers in hint.',
       parameters: z.object({
         postId: z.string().describe('Property (post) ID'),
         hint: z
           .string()
           .optional()
           .describe(
-            'Host placement answers: add-on vs stay, non-member/special, hosted — plus any property context',
+            'Host quiz answers (hosted, special, exclusive/pro, once-off/addon) plus property context',
           ),
       }),
       // @ts-expect-error - AI SDK type inference issue
@@ -1101,33 +1067,32 @@ Use these official host-provided details when suggesting packages, house-manual 
 
 🏠 NEW LISTING / PROPERTY FIRST (overrides generic “jump straight to package preview”):
 - If the user wants a **new** property/listing/post, call **createPostTool** first (title + description from their message).
-- **createPostTool** does NOT return package ideas. After it succeeds, reply with the **package placement questions** (add-on vs stay, non-member special, hosted) — do NOT call suggestCatalogPackages or previewPackage until they answer.
-- When they answer, call **suggestCatalogPackages** with **postId** = new post.id and **hint** = their placement answers, OR **previewPackageTool** if they named a specific package/price.
+- **createPostTool** does NOT return package ideas. After it succeeds the UI shows a **yes/no placement quiz** — do NOT paste long question lists; keep replies short. Do NOT call suggestCatalogPackages until they submit the quiz or send preferences.
+- When they submit quiz answers (message includes "CALL suggestCatalogPackages" or "Host package preferences"), call **suggestCatalogPackages** with **postId** and **hint**, OR **previewPackageTool** if they named a specific package/price.
 - Only skip createPostTool if they are clearly working with an **existing** listing already in context.
 - For every new or updated listing, collect **house-manual** details when possible: **wifi** (network + password) and **lockbox** (access code / key-safe instructions). Pass them into createPostTool or remind the host to add them in property settings. Guests see these on their booking assistant.
 
-📋 PACKAGE PLACEMENT (ask before first catalog/preview on a listing):
-Ask these unless the user already answered in the same thread:
-1. **Repeat add-on or stay package?** → add-on category for cleaning/tours/extras; standard/special for stays.
-2. **Offer a deal to guests without a subscription?** → special category + entitlement **none** for non-members; standard entitlement for members only.
-3. **Hosted experience?** → hosted category when host/staff is involved.
-
-Map answers into **category** and **entitlement** on previewPackageTool and into **hint** for suggestCatalogPackages.
+📋 PACKAGE PLACEMENT (UI quiz — do not repeat in chat):
+The app shows yes/no buttons after a new draft or "Generate packages". Map answers:
+- Host involved → **hosted**; autonomous → **standard** stay
+- Run special → **special**
+- Exclusive → **pro** entitlement; publicly accessible → **none**
+- Once-off purchase → **addon**
 
 📦 STARTER PACKAGE IDEAS (existing listing):
-- If the user asks to "Generate packages" or starter ideas for an **existing** property with postId: if placement is unknown, ask the three questions first; then call **suggestCatalogPackages** with postId + hint (their answers).
+- "Generate packages" opens the same quiz in the UI. Call **suggestCatalogPackages** only after they submit answers (hint in message).
 - After suggestions are shown, the UI offers "Approve all"; do not create packages unless the user approves.
 
 🚨 TOOL CALLING RULES:
-1. **New listing flow**: createPost → placement questions (text) → suggestCatalogPackages or previewPackage after answers.
-2. When the user says "CALL previewPackageTool NOW" or gives explicit package details (name, price, category), call **previewPackageTool** immediately with **category** and **entitlement** from placement answers — **unless** you still need placement Q&A for a brand-new listing with no answers yet.
-2b. When the user says "CALL suggestCatalogPackages NOW" with postId: call suggestCatalogPackages only if placement is known or included in the message; otherwise ask placement questions first.
-3. For vague "create a package" with no placement context on a **new** listing, ask placement questions before tools.
+1. **New listing flow**: createPost → UI placement quiz → suggestCatalogPackages after submit.
+2. When the user says "CALL previewPackageTool NOW" or gives explicit package details (name, price, category), call **previewPackageTool** with **category** and **entitlement** from their quiz/preferences.
+2b. When the user says "CALL suggestCatalogPackages NOW" with postId and hint: call suggestCatalogPackages immediately.
+3. Do not output long placement question lists — the UI handles that.
 4. After previewPackageTool completes, provide a brief text response explaining the preview.
 
 EXAMPLES:
-- User drafts new plek → createPost → ask placement questions (text only).
-- User: "weekly stay, special for non-members, not hosted" → suggestCatalogPackages(postId, hint=their answer) OR previewPackage(category=special, entitlement=none).
+- User drafts new plek → createPost → UI quiz → suggestCatalogPackages with hint from quiz.
+- User message includes quiz hint (hosted, special, pro, addon keywords) → suggestCatalogPackages(postId, hint=...).
 - User: "CALL previewPackageTool NOW with name=X, category=hosted, entitlement=standard" → previewPackage immediately.
 
 AFTER TOOL CALLS:
@@ -1155,7 +1120,7 @@ PROPERTY & PACKAGE MANAGEMENT GUIDELINES:
 
 PROPERTY CREATION:
 1. When user wants a new listing:
-   - createPostTool → package placement questions → suggestCatalogPackages or previewPackage → createPackageTool after they confirm a preview
+   - createPostTool → UI placement quiz → suggestCatalogPackages or previewPackage → createPackageTool after they confirm a preview
 2. If user wants to create a package but doesn't specify a property:
    - Prefer the listing selected in Manage (sidebar). If none is selected, createPackageTool will create a draft property automatically and attach the package.
    - Hosts can also use createPostTool explicitly if they want to name/configure a listing before packages.
