@@ -38,6 +38,7 @@ import {
   normalizePackageEntitlement,
   type CustomerEntitlement,
 } from '@/utils/packageSuggestions'
+import { categoryPriorityScore, hasPackageCategory } from '@/utils/packageCategories'
 import { calculateTotal } from '@/lib/calculateTotal'
 import { useYoco } from '@/providers/Yoco'
 import { yocoService, YocoProduct, YocoPaymentLink } from '@/lib/yocoService'
@@ -50,7 +51,7 @@ interface Package {
   name: string
   description: string
   multiplier: number
-  category: string
+  category: string | string[]
   entitlement?: 'none' | 'standard' | 'pro'
   minNights: number
   maxNights: number
@@ -475,7 +476,7 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
       }
       
       // Filter out addon packages - these should only appear on the booking page
-      if (pkg.category === 'addon') {
+      if (hasPackageCategory(pkg.category, 'addon')) {
         return false
       }
 
@@ -505,12 +506,9 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
 
   const sortPackagesForDisplay = useCallback((list: Package[]) => {
     // Higher priority first: special > hosted > standard
-    const categoryPriority: Record<string, number> = { special: 3, hosted: 2, standard: 1 }
     return [...list].sort((a, b) => {
-      const aCat = String(a?.category || '').trim().toLowerCase()
-      const bCat = String(b?.category || '').trim().toLowerCase()
-      const aPriority = categoryPriority[aCat] || 0
-      const bPriority = categoryPriority[bCat] || 0
+      const aPriority = categoryPriorityScore(a?.category)
+      const bPriority = categoryPriorityScore(b?.category)
       if (aPriority !== bPriority) return bPriority - aPriority
       // Tie-breaker: higher multiplier first
       return (b.multiplier || 1) - (a.multiplier || 1)
@@ -534,12 +532,12 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
       if (!res.ok) throw new Error(data?.error || `Failed to load packages (HTTP ${res.status})`)
 
       const rawPackages: Package[] = data?.packages || []
-      const publicBookable = rawPackages.some((pkg) => isPublicBookablePackage(pkg))
+      const publicBookable = rawPackages.some((pkg) => isPublicBookablePackage(pkg as any))
       setHasPublicBookablePackages(publicBookable)
 
       const filtered = rawPackages.filter((pkg: Package) => {
         if (!pkg.isEnabled) return false
-        if (pkg.category === 'addon') return false
+        if (hasPackageCategory(pkg.category, 'addon')) return false
 
         const pkgEntitlement = normalizePackageEntitlement(pkg.entitlement)
         if (customerEntitlement === 'none') return pkgEntitlement === 'none'
@@ -1134,7 +1132,7 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
     
     // Re-filter packages when entitlement changes
     if (originalPackagesRef.current.length > 0) {
-      setHasPublicBookablePackages(originalPackagesRef.current.some((pkg) => isPublicBookablePackage(pkg)))
+      setHasPublicBookablePackages(originalPackagesRef.current.some((pkg) => isPublicBookablePackage(pkg as any)))
       const filtered = filterPackagesByEntitlement(originalPackagesRef.current)
       setPackages(sortPackagesForDisplay(filtered))
     }

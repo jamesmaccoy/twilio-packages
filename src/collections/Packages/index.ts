@@ -110,6 +110,7 @@ const Packages: CollectionConfig = {
     {
       name: 'category',
       type: 'select',
+      hasMany: true,
       options: [
         { label: 'Standard', value: 'standard' },
         { label: 'Hosted', value: 'hosted' },
@@ -117,7 +118,7 @@ const Packages: CollectionConfig = {
         { label: 'Special', value: 'special' },
       ],
       required: false, // Changed to false to prevent forced defaults
-      defaultValue: 'standard',
+      defaultValue: ['standard'],
     },
     {
       name: 'entitlement',

@@ -7,6 +7,7 @@ import {
   normalizePackageEntitlement,
   type CustomerEntitlement,
 } from '@/utils/packageSuggestions'
+import { hasPackageCategory } from '@/utils/packageCategories'
 import jwt from 'jsonwebtoken'
 
 async function getAuthedUser(payload: any, request: NextRequest): Promise<any | null> {
@@ -359,7 +360,7 @@ export async function GET(
     // - pro: entitlement=standard or pro
     const allPackages = combinedPackages
       .filter((pkg: any) => Boolean(pkg?.isEnabled))
-      .filter((pkg: any) => String(pkg?.category || '').trim().toLowerCase() !== 'addon')
+      .filter((pkg: any) => !hasPackageCategory(pkg?.category, 'addon'))
       .filter((pkg: any) => {
         const pkgEntitlement = normalizePackageEntitlement(pkg?.entitlement)
 

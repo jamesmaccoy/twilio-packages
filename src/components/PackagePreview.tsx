@@ -9,7 +9,7 @@ import { formatAmountToZARNoCents } from "@/lib/currency"
 interface PackagePreviewProps {
   name: string
   description: string
-  category: 'standard' | 'hosted' | 'addon' | 'special'
+  category: 'standard' | 'hosted' | 'addon' | 'special' | Array<'standard' | 'hosted' | 'addon' | 'special'>
   entitlement?: 'none' | 'standard' | 'pro'
   minNights?: number
   maxNights?: number
@@ -39,6 +39,7 @@ export function PackagePreview({
 }: PackagePreviewProps) {
   const emoji = name.split(' ')[0] || '📦'
   const displayName = name.substring(name.indexOf(' ') + 1) || name
+  const categoryLabel = Array.isArray(category) ? category.join(' · ') : category
 
   return (
     <Card className="group bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-md transition-all duration-300 flex flex-col h-full">
@@ -66,7 +67,7 @@ export function PackagePreview({
         <div className="flex justify-between items-start mb-2">
           <div className="flex-1">
             <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold tracking-wide uppercase text-slate-500 bg-slate-100 mb-2">
-              {category}
+              {categoryLabel}
             </span>
             <h3 className="text-lg font-semibold text-slate-900 leading-tight group-hover:text-blue-600 transition-colors">
               {displayName}

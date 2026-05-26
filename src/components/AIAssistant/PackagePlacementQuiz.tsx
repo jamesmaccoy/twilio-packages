@@ -125,13 +125,13 @@ export function PackagePlacementQuiz({
           {item.question}
         </p>
         <p className="text-xs text-slate-500 dark:text-muted-foreground mt-2">{item.help}</p>
-        <div className="flex flex-wrap gap-2 mt-4">
+        <div className="flex flex-col gap-2 mt-4 w-full">
           <Button
             type="button"
             size="default"
             variant="outline"
             disabled={disabled}
-            className="rounded-full min-w-[5rem] flex-1 sm:flex-none border-teal-200 hover:bg-teal-50 dark:hover:bg-teal-950/30"
+            className="w-full h-auto min-h-11 py-2.5 px-4 rounded-lg whitespace-normal text-center leading-snug border-teal-200 hover:bg-teal-50 dark:hover:bg-teal-950/30"
             onClick={() => choose(true)}
           >
             {item.yesLabel}
@@ -141,7 +141,7 @@ export function PackagePlacementQuiz({
             size="default"
             variant="outline"
             disabled={disabled}
-            className="rounded-full min-w-[5rem] flex-1 sm:flex-none"
+            className="w-full h-auto min-h-11 py-2.5 px-4 rounded-lg whitespace-normal text-center leading-snug"
             onClick={() => choose(false)}
           >
             {item.noLabel}

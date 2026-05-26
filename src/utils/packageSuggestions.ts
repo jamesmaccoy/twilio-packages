@@ -1,4 +1,5 @@
 import { SubscriptionStatus } from '@/hooks/useSubscription'
+import { hasPackageCategory } from '@/utils/packageCategories'
 
 // Define customer entitlement types
 export type CustomerEntitlement = 'standard' | 'pro' | 'none'
@@ -12,11 +13,11 @@ export function normalizePackageEntitlement(raw: unknown): CustomerEntitlement {
 /** True when a non-subscriber may book this package (explicit entitlement=none). */
 export function isPublicBookablePackage(pkg: {
   isEnabled?: boolean
-  category?: string
+  category?: string | string[]
   entitlement?: unknown
 }): boolean {
   if (!pkg?.isEnabled) return false
-  if (String(pkg.category || '').trim().toLowerCase() === 'addon') return false
+  if (hasPackageCategory(pkg.category, 'addon')) return false
   return normalizePackageEntitlement(pkg.entitlement) === 'none'
 }
 
