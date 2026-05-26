@@ -1,12 +1,12 @@
-import { generateObject, streamText, tool, UIMessage } from 'ai'
+import { streamText, tool, UIMessage } from 'ai'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { NextRequest, NextResponse } from 'next/server'
 import { getMeUser } from '@/utilities/getMeUser'
 import { getPayload } from 'payload'
 import configPromise from '@/payload.config'
 import { z } from 'zod'
-import { BASE_PACKAGE_TEMPLATES, getDefaultPackageTitle } from '@/lib/package-types'
-import { applyPlacementOverrides } from '@/lib/package-placement'
+import { parsePlacementFromHint } from '@/lib/package-placement'
+import { runCatalogPackageSuggestions } from '@/lib/catalog-suggestions'
 import { sendPackageActivityNotification } from '@/lib/emailNotifications'
 
 // Zod schemas to validate structured JSON that is streamed to the UI
@@ -59,162 +59,6 @@ const googleAI = createGoogleGenerativeAI({
 function extractLexicalFirstParagraph(content: any): string {
   const t = content?.root?.children?.[0]?.children?.[0]?.text
   return typeof t === 'string' ? t.trim() : ''
-}
-
-const catalogSuggestionSchema = z.object({
-  recommendations: z
-    .array(
-      z.object({
-        revenueCatId: z.string(),
-        suggestedName: z.string(),
-        description: z.string(),
-        features: z.array(z.string()),
-        baseRate: z.number().optional(),
-      }),
-    )
-    .min(1)
-    .max(4),
-})
-
-function fallbackCatalogBaseRateRands(category: string, minNights: number) {
-  const c = String(category || 'standard')
-  // Higher defaults than before; tuned for ZAR nightly pricing + obvious value ladder.
-  if (c === 'addon') return 450
-  if (c === 'hosted') return minNights <= 1 ? 650 : 850
-  if (c === 'special') return minNights <= 1 ? 550 : 750
-  // standard
-  return minNights <= 1 ? 480 : 600
-}
-
-async function runCatalogPackageSuggestions(
-  payload: any,
-  user: any,
-  postId: string,
-  hint?: string,
-): Promise<{
-  success: boolean
-  postId: string
-  recommendations: z.infer<typeof catalogSuggestionSchema>['recommendations']
-  message: string
-}> {
-  const pid = String(postId).trim()
-  try {
-    const post = await payload.findByID({
-      collection: 'posts',
-      id: pid,
-      depth: 1,
-      user,
-    })
-    const title = typeof post?.title === 'string' ? post.title.trim() : ''
-    const metaDesc =
-      typeof (post as any)?.meta?.description === 'string'
-        ? (post as any).meta.description.trim()
-        : ''
-    const body = extractLexicalFirstParagraph((post as any)?.content)
-    const postBaseRate =
-      typeof (post as any)?.baseRate === 'number' && Number.isFinite((post as any).baseRate)
-        ? Math.max(0, Math.round((post as any).baseRate))
-        : null
-
-    const knownTemplates = BASE_PACKAGE_TEMPLATES.map((t) => ({
-      revenueCatId: t.revenueCatId,
-      defaultName: getDefaultPackageTitle(t),
-      category: t.category,
-      customerTierRequired: t.customerTierRequired,
-      minNights: t.minNights,
-      maxNights: t.maxNights,
-      features: t.features.map((f) => f.label).join(', '),
-    }))
-
-    const knownIds = new Set(BASE_PACKAGE_TEMPLATES.map((t) => t.revenueCatId))
-    const modelName = process.env.GEMINI_STREAMING_MODEL || 'models/gemini-2.5-flash'
-
-    const result = await generateObject({
-      model: googleAI(modelName),
-      schema: catalogSuggestionSchema,
-      prompt: `Pick packages from this catalog only (use exact revenueCatId values).
-
-Catalog:
-${knownTemplates.map((t) => `- ${t.revenueCatId}: ${t.defaultName} [${t.category}, tier: ${t.customerTierRequired}, ${t.minNights}-${t.maxNights} nights, features: ${t.features}]`).join('\n')}
-
-Property title: "${title || 'Untitled'}"
-Property base rate (ZAR per night): "${typeof postBaseRate === 'number' ? postBaseRate : 'N/A'}"
-Property meta description: "${metaDesc || 'N/A'}"
-Property body (first paragraph): "${body || 'N/A'}"
-User hint / host placement answers: "${hint || 'N/A'}"
-
-Return 1–4 recommendations. suggestedName/description/features must be specific to this property, not generic.
-
-Host placement (use hint when present):
-- Add-on / once-off / cleaning / tours → prefer **addon** catalog rows
-- Hosted / concierge → prefer **hosted** rows
-- Special for non-members / guests without subscription → prefer **special** or tier **none** rows
-- Member-only stays → tier **standard** or **pro** as appropriate
-
-IMPORTANT: Include a baseRate for each recommendation as a whole-number ZAR amount (e.g. 650). Use the property's base rate as a reference if provided, and adjust for tier:
-- hosted: higher than standard
-- special: mid-to-high
-- addon: one-time-ish fee (still use baseRate field)`,
-    })
-
-    const filtered = result.object.recommendations.filter((r) => knownIds.has(r.revenueCatId))
-    const picked = filtered.length ? filtered : result.object.recommendations
-    // Catalog rows do not include min/max in the LLM schema — attach template nights so
-    // "Approve all" persists the same durations as the catalog (incl. 0.5-night hourly).
-    const mapped = picked.map((r) => {
-      const tpl = BASE_PACKAGE_TEMPLATES.find((t) => t.revenueCatId === r.revenueCatId)
-      const tplCategory = String(tpl?.category || 'standard')
-      const tplMin = typeof tpl?.minNights === 'number' ? tpl.minNights : 1
-      const fallbackBase = fallbackCatalogBaseRateRands(tplCategory, tplMin)
-      const baseRate =
-        typeof (r as any)?.baseRate === 'number' && Number.isFinite((r as any).baseRate)
-          ? Math.max(0, Math.round((r as any).baseRate))
-          : typeof postBaseRate === 'number' && postBaseRate > 0
-            ? Math.max(0, Math.round(postBaseRate))
-            : fallbackBase
-      if (!tpl) {
-        return {
-          ...r,
-          baseRate,
-          details: {
-            minNights: 1,
-            maxNights: 1,
-            category: 'standard' as const,
-            customerTierRequired: 'standard' as const,
-            multiplier: 1,
-          },
-        }
-      }
-      return {
-        ...r,
-        baseRate,
-        details: {
-          minNights: tpl.minNights,
-          maxNights: tpl.maxNights,
-          category: tpl.category,
-          customerTierRequired: tpl.customerTierRequired,
-          multiplier: tpl.baseMultiplier,
-        },
-      }
-    })
-    const recommendations = applyPlacementOverrides(mapped, hint)
-    return {
-      success: true,
-      postId: pid,
-      recommendations,
-      message:
-        recommendations.length > 0
-          ? `Here are ${recommendations.length} catalog package idea(s) tailored to this listing.`
-          : 'Suggestions generated; verify revenueCatId values match the catalog.',
-    }
-  } catch (error: any) {
-    return {
-      success: false,
-      postId: pid,
-      recommendations: [],
-      message: error?.message || 'Failed to suggest catalog packages',
-    }
-  }
 }
 
 function buildMinimalPostContent(text: string) {
@@ -270,6 +114,24 @@ export async function POST(request: NextRequest) {
 
     const payload = await getPayload({ config: configPromise })
     const posts = pageData?.posts || []
+
+    const extractLastUserText = (msgs: UIMessage[]): string => {
+      const last = [...msgs].reverse().find((m) => m?.role === 'user')
+      if (!last) return ''
+      const raw = last as any
+      if (typeof raw.content === 'string' && raw.content.trim()) return raw.content.trim()
+      if (Array.isArray(raw.parts)) {
+        return raw.parts
+          .filter((p: any) => p?.type === 'text' && typeof p?.text === 'string')
+          .map((p: any) => p.text)
+          .join('\n')
+          .trim()
+      }
+      return ''
+    }
+
+    const lastUserTextForTools = extractLastUserText(messages)
+
     /** Listing explicitly selected in Manage UI (sidebar); do not fall back to first post */
     const selectedPostId =
       typeof pageData?.postId === 'string' && pageData.postId.trim() ? pageData.postId.trim() : null
@@ -467,7 +329,7 @@ export async function POST(request: NextRequest) {
     // @ts-ignore - AI SDK tool type inference issue
     const createPackageTool = tool({
       description:
-        '🚨 CREATE PACKAGE: Persist the package in the database. Use when the user confirms the preview. Prefer pageData.postId / tool input postId for the listing. If no property is selected, a draft property (post) is created first so the package always belongs to a listing.',
+        '🚨 CREATE PACKAGE: Persist the package in the database. Use when the user confirms a preview or provides package fields with a postId. NEVER call createPostTool when postId is provided. Prefer pageData.postId / tool input postId. Only create a draft property when no postId exists anywhere.',
       parameters: z.object({
         name: z.string().describe('Package name'),
         description: z.string().describe('Package description'),
@@ -890,12 +752,29 @@ export async function POST(request: NextRequest) {
             lockbox,
           } = input
 
-          const title = typeof titleRaw === 'string' ? titleRaw.trim() : ''
+          let title = typeof titleRaw === 'string' ? titleRaw.trim() : ''
+          if (!title && typeof lastUserTextForTools === 'string') {
+            const titleFromMessage = lastUserTextForTools.match(
+              /title:\s*(.+?)(?:\r?\n|description:)/i,
+            )?.[1]
+            if (titleFromMessage?.trim()) title = titleFromMessage.trim()
+          }
+
+          if (!title && selectedPostId) {
+            return {
+              success: false,
+              error: 'Listing already exists',
+              message:
+                'This property is already saved. Use package tools to add or edit packages — do not create another listing.',
+            }
+          }
+
           if (!title) {
             return {
               success: false,
               error: 'Title is required',
-              message: 'Failed to create property: Title is required',
+              message:
+                'Failed to create property: add a Title line in your message (e.g. Title: Beach Cottage) or use Draft a new plek with a title filled in.',
             }
           }
 
@@ -1001,7 +880,14 @@ export async function POST(request: NextRequest) {
       }),
       // @ts-expect-error - AI SDK type inference issue
       execute: async ({ postId: pid, hint }: any) => {
-        const out = await runCatalogPackageSuggestions(payload, user, String(pid).trim(), hint)
+        const placement = parsePlacementFromHint(hint)
+        const out = await runCatalogPackageSuggestions(
+          payload,
+          user,
+          String(pid).trim(),
+          hint,
+          placement ?? undefined,
+        )
         if (!out.success) {
           return {
             success: false,
@@ -1067,8 +953,9 @@ Use these official host-provided details when suggesting packages, house-manual 
 
 🏠 NEW LISTING / PROPERTY FIRST (overrides generic “jump straight to package preview”):
 - If the user wants a **new** property/listing/post, call **createPostTool** first (title + description from their message).
-- **createPostTool** does NOT return package ideas. After it succeeds the UI shows a **yes/no placement quiz** — do NOT paste long question lists; keep replies short. Do NOT call suggestCatalogPackages until they submit the quiz or send preferences.
-- When they submit quiz answers (message includes "CALL suggestCatalogPackages" or "Host package preferences"), call **suggestCatalogPackages** with **postId** and **hint**, OR **previewPackageTool** if they named a specific package/price.
+- **createPostTool** does NOT return package ideas. After it succeeds the UI shows a **yes/no placement quiz** — do NOT paste long question lists; keep replies short. Do NOT call suggestCatalogPackages until they submit the quiz.
+- When the message includes **__placement_json__:** or "CALL suggestCatalogPackages", call **suggestCatalogPackages** with the full hint string (includes structured quiz JSON). Never invent a standard package if the hint requires hosted/pro/special/addon.
+- **NEVER call createPostTool** when a **postId** is already in the message or selected in context — use **createPackageTool** only.
 - Only skip createPostTool if they are clearly working with an **existing** listing already in context.
 - For every new or updated listing, collect **house-manual** details when possible: **wifi** (network + password) and **lockbox** (access code / key-safe instructions). Pass them into createPostTool or remind the host to add them in property settings. Guests see these on their booking assistant.
 
@@ -1163,7 +1050,7 @@ PACKAGE MANAGEMENT:
 11. SPECIAL PACKAGES: These are very popular with customers! When appropriate, suggest creating special packages for promotions, seasonal offers, or unique experiences. After creating a package, mention that special packages tend to attract more bookings.
 12. PACKAGE MANAGEMENT: After creating a package, remind the host they can view and manage all packages at /manage/packages/[postId]. They can enable/disable packages, update pricing, and see which packages are performing well.
 
-When user asks to create a package from a property they offer, create the property first, then create the package and assign it to that property.${
+When a postId is already selected or in the message, use createPackageTool only — do not create another property.${
       existingPackageIdFromContext
         ? `
 
@@ -1174,31 +1061,24 @@ When user asks to create a package from a property they offer, create the proper
         : ''
     }`
 
-    const lastUserMessage = [...messages]
-      .reverse()
-      .find((m: any) => m?.role === 'user')
+    const lastUserText = lastUserTextForTools.toLowerCase()
 
-    const lastUserText =
-      typeof (lastUserMessage as any)?.content === 'string'
-        ? (lastUserMessage as any).content.toLowerCase()
-        : Array.isArray((lastUserMessage as any)?.parts)
-          ? (lastUserMessage as any).parts
-              .filter((p: any) => p?.type === 'text' && typeof p?.text === 'string')
-              .map((p: any) => p.text.toLowerCase())
-              .join(' ')
-          : ''
+    const looksLikeExplicitCreatePackage =
+      /createpackagetool|please create the package|create the package using/i.test(lastUserText)
 
     // Must catch phrases like "create a new property" (word "new" between verb and noun).
     const looksLikeNewProperty =
-      /\b(new\s+(property|listing|post|place|airbnb))\b/i.test(lastUserText) ||
+      !looksLikeExplicitCreatePackage &&
+      !/\bpostid\b/i.test(lastUserText) &&
+      (/\b(new\s+(property|listing|post|place|airbnb))\b/i.test(lastUserText) ||
       /\b(another|second|additional)\s+(property|listing|post)\b/i.test(lastUserText) ||
       /(add\s+(a\s+)?(property|listing|post)|draft\s+(property|listing)|list\s+my\s+(place|home|property|house|apartment)|I\s+('m|'ve|am)\s+list|I\s+have\s+(a\s+)?(new\s+)?(place|property|listing|house|cottage|cabin|apartment|studio|villa|flat)|register\s+(my\s+)?(property|listing)|listing\s+called|property\s+called|airbnb|guesthouse|guest house)/i.test(
         lastUserText,
       ) ||
-      /\b(create|add|start|open|register|set\s+up)\b[\s\S]{0,40}\b(property|listing|post)\b/i.test(
+      (/\b(create|add|start|open|register|set\s+up)\b[\s\S]{0,40}\b(property|listing|post)\b/i.test(
         lastUserText,
       ) &&
-      !/\bpackage(s)?\b/i.test(lastUserText)
+        !/\bpackage(s)?\b/i.test(lastUserText)))
 
     // Do NOT use bare "create" / "make" — they match "create a new property" and wrongly force previewPackage.
     const looksLikePackagePreviewIntent =
@@ -1209,7 +1089,9 @@ When user asks to create a package from a property they offer, create the proper
         /\b(R\s?\d{2,}|rand|\bzar\b|price|rate|per\s+night|nightly|weekly)\b/i.test(lastUserText))
 
     const shouldForcePreviewTool =
-      !looksLikeNewProperty && looksLikePackagePreviewIntent
+      !looksLikeNewProperty && looksLikePackagePreviewIntent && !looksLikeExplicitCreatePackage
+
+    const shouldForceCreatePackageTool = looksLikeExplicitCreatePackage
 
     const normalizedModelMessages = messages
       .map((msg: any) => {
@@ -1237,6 +1119,19 @@ When user asks to create a package from a property they offer, create the proper
         ? requestBody.message.trim()
         : ''
 
+    const manageTools: Record<string, any> = {
+      suggestCatalogPackages: suggestCatalogPackagesForPostTool,
+      previewPackage: previewPackageTool,
+      createPackage: createPackageTool,
+      findPackages: findPackagesTool,
+      updatePackage: updatePackageTool,
+      deletePackage: deletePackageTool,
+    }
+    // When a listing exists or the user is saving a package, hide createPost so the model cannot re-create the property.
+    if (!selectedPostId && !looksLikeExplicitCreatePackage) {
+      manageTools.createPost = createPostTool
+    }
+
     const result = streamText({
       model: model as any,
       system: systemPrompt,
@@ -1246,16 +1141,12 @@ When user asks to create a package from a property they offer, create the proper
           : fallbackText
             ? ([{ role: 'user', content: fallbackText }] as any)
             : ([] as any),
-      ...(shouldForcePreviewTool ? { toolChoice: { type: 'tool' as const, toolName: 'previewPackage' } } : {}),
-      tools: {
-        createPost: createPostTool,
-        suggestCatalogPackages: suggestCatalogPackagesForPostTool,
-        previewPackage: previewPackageTool,
-        createPackage: createPackageTool,
-        findPackages: findPackagesTool,
-        updatePackage: updatePackageTool,
-        deletePackage: deletePackageTool,
-      },
+      ...(shouldForceCreatePackageTool
+        ? { toolChoice: { type: 'tool' as const, toolName: 'createPackage' } }
+        : shouldForcePreviewTool
+          ? { toolChoice: { type: 'tool' as const, toolName: 'previewPackage' } }
+          : {}),
+      tools: manageTools,
     })
 
     return result.toUIMessageStreamResponse()

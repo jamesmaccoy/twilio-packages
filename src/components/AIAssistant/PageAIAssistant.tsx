@@ -20,10 +20,7 @@ import { DefaultChatTransport } from 'ai'
 import { PackagePreview } from '@/components/PackagePreview'
 import { FormattedAssistantContent } from '@/components/AIAssistant/FormattedAssistantContent'
 import { PackagePlacementQuiz } from '@/components/AIAssistant/PackagePlacementQuiz'
-import {
-  buildSuggestPackagesMessage,
-  type PackagePlacementAnswers,
-} from '@/lib/package-placement'
+import type { PackagePlacementAnswers } from '@/lib/package-placement'
 
 /** Editable template — matches manage chat “new listing” routing; user should edit title/description then send. */
 const MANAGE_NEW_LISTING_PROMPT = `Create a new listing for my property.
@@ -593,34 +590,89 @@ export function PageAIAssistant({ context, placeholder, className, showActions =
     }
   }
 
-  /** Pass preview from the inline tool UI so confirm works without duplicating state into a second card. */
+  /** Persist package via API — avoids the model calling createPostTool by mistake. */
   const handleConfirmPackage = async (previewFromUi?: any) => {
     const source = previewFromUi ?? pendingPackagePreview
-    if (!source || !isManageContext || !sendMessage) return
+    if (!source || !isManageContext) return
+
+    const previewData = { ...source }
+    const postId = String(
+      previewData.postId || context?.data?.postId || manageContextPostId || '',
+    ).trim()
+    if (!postId) {
+      console.error('Cannot create package: no postId')
+      return
+    }
 
     setIsSavingPackage(true)
-    const previewData = { ...source }
     setPendingPackagePreview(null)
 
-    const createMessage = `Please create the package using createPackageTool with these details:
-- name: "${previewData.name}"
-- description: "${previewData.description}"
-- category: "${previewData.category}"
-- minNights: ${previewData.minNights}
-- maxNights: ${previewData.maxNights}
-- baseRate: ${previewData.baseRate || 0}
-- multiplier: ${previewData.multiplier || 1}
-- entitlement: "${previewData.entitlement || 'standard'}"
-- postId: "${previewData.postId}"
-- features: ${JSON.stringify(previewData.features || [])}
-${previewData.revenueCatId ? `- revenueCatId: "${previewData.revenueCatId}"` : ''}
-${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
-
     try {
-      await sendMessage({ text: createMessage })
+      const features = Array.isArray(previewData.features) ? previewData.features : []
+      const res = await fetch('/api/packages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          post: postId,
+          name: previewData.name,
+          description: previewData.description,
+          category: previewData.category || 'standard',
+          entitlement: previewData.entitlement || 'standard',
+          minNights: previewData.minNights ?? 1,
+          maxNights: previewData.maxNights ?? 1,
+          baseRate: previewData.baseRate || undefined,
+          multiplier: previewData.multiplier ?? 1,
+          features: features.map((f: string) => ({ feature: String(f) })),
+          revenueCatId: previewData.revenueCatId || undefined,
+          yocoId: previewData.yocoId || undefined,
+          isEnabled: true,
+        }),
+      })
+      const doc = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(doc?.error || doc?.details || `Failed to save package (HTTP ${res.status})`)
+      }
+
+      const packageId = String(doc?.id || doc?.doc?.id || '').trim()
+      if (packageId) {
+        setCreatedPackageId(packageId)
+        window.dispatchEvent(
+          new CustomEvent('packageCreated', {
+            detail: { packageId, postId, package: doc, createdNewPost: false },
+          }),
+        )
+      }
+
+      if (typeof setMessages === 'function') {
+        setMessages((prev: any[]) => [
+          ...prev,
+          {
+            id: `local-package-created-${Date.now()}`,
+            role: 'assistant',
+            parts: [
+              {
+                type: 'text',
+                text: `Package "${previewData.name}" was saved. You can manage it on the dashboard.`,
+              },
+            ],
+          },
+        ])
+      }
     } catch (error) {
       console.error('Error confirming package:', error)
       setPendingPackagePreview(previewData)
+      const msg = error instanceof Error ? error.message : 'Failed to save package'
+      if (typeof setMessages === 'function') {
+        setMessages((prev: any[]) => [
+          ...prev,
+          {
+            id: `local-package-err-${Date.now()}`,
+            role: 'assistant',
+            parts: [{ type: 'text', text: `Package was not saved: ${msg}` }],
+          },
+        ])
+      }
     } finally {
       setIsSavingPackage(false)
     }
@@ -872,17 +924,59 @@ ${previewData.yocoId ? `- yocoId: "${previewData.yocoId}"` : ''}`
 
   const submitPlacementQuiz = useCallback(
     async (postId: string, answers: PackagePlacementAnswers) => {
-      if (!sendMessage) return
       placementQuizCompletedRef.current.add(postId)
       setGeneratePackagesQuiz(null)
       try {
-        await sendMessage({ text: buildSuggestPackagesMessage(postId, answers) })
+        const res = await fetch('/api/packages/suggest-catalog', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ postId, placement: answers }),
+        })
+        const data = await res.json().catch(() => null)
+        if (!res.ok) {
+          throw new Error(data?.error || `Failed to suggest packages (HTTP ${res.status})`)
+        }
+
+        if (typeof setMessages === 'function') {
+          setMessages((prev: any[]) => [
+            ...prev,
+            {
+              id: `placement-suggest-${Date.now()}`,
+              role: 'assistant',
+              parts: [
+                {
+                  type: 'tool-suggestCatalogPackages',
+                  toolCallId: `placement-quiz-${Date.now()}`,
+                  state: 'output-available',
+                  output: {
+                    success: true,
+                    postId: data.postId || postId,
+                    recommendations: data.recommendations || [],
+                    message: data.message || 'Package suggestions ready.',
+                  },
+                },
+              ],
+            },
+          ])
+        }
       } catch (error) {
         console.error('Error submitting placement quiz:', error)
         placementQuizCompletedRef.current.delete(postId)
+        const msg = error instanceof Error ? error.message : 'Failed to suggest packages'
+        if (typeof setMessages === 'function') {
+          setMessages((prev: any[]) => [
+            ...prev,
+            {
+              id: `placement-suggest-err-${Date.now()}`,
+              role: 'assistant',
+              parts: [{ type: 'text', text: `Could not load package suggestions: ${msg}` }],
+            },
+          ])
+        }
       }
     },
-    [sendMessage],
+    [setMessages],
   )
 
   const handleActionClick = async (action: string) => {

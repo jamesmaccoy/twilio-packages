@@ -1,4 +1,6 @@
-/** Host-facing yes/no quiz → catalog category + entitlement hints */
+/** Host-facing yes/no quiz → catalog category + entitlement */
+
+import type { PackageCategory, CustomerTier } from '@/lib/package-types'
 
 export type PackagePlacementAnswers = {
   hostInvolved: boolean
@@ -6,6 +8,8 @@ export type PackagePlacementAnswers = {
   exclusive: boolean
   onceOff: boolean
 }
+
+export const PLACEMENT_JSON_MARKER = '__placement_json__:'
 
 export const PACKAGE_PLACEMENT_QUIZ_ITEMS = [
   {
@@ -38,73 +42,99 @@ export const PACKAGE_PLACEMENT_QUIZ_ITEMS = [
   },
 ] as const
 
+export function resolvePlacementTargets(answers: PackagePlacementAnswers): {
+  category: PackageCategory
+  entitlement: CustomerTier
+} {
+  let category: PackageCategory = 'standard'
+  if (answers.onceOff) category = 'addon'
+  else if (answers.hostInvolved) category = 'hosted'
+  else if (answers.runSpecial) category = 'special'
+
+  const entitlement: CustomerTier = answers.exclusive ? 'pro' : 'none'
+  return { category, entitlement }
+}
+
+export function parsePlacementFromHint(hint?: string): PackagePlacementAnswers | null {
+  if (!hint?.includes(PLACEMENT_JSON_MARKER)) return null
+  const raw = hint.slice(hint.indexOf(PLACEMENT_JSON_MARKER) + PLACEMENT_JSON_MARKER.length).trim()
+  const jsonEnd = raw.indexOf('}')
+  if (jsonEnd < 0) return null
+  try {
+    const parsed = JSON.parse(raw.slice(0, jsonEnd + 1)) as Partial<PackagePlacementAnswers>
+    if (
+      typeof parsed.hostInvolved === 'boolean' &&
+      typeof parsed.runSpecial === 'boolean' &&
+      typeof parsed.exclusive === 'boolean' &&
+      typeof parsed.onceOff === 'boolean'
+    ) {
+      return {
+        hostInvolved: parsed.hostInvolved,
+        runSpecial: parsed.runSpecial,
+        exclusive: parsed.exclusive,
+        onceOff: parsed.onceOff,
+      }
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
 export function buildPlacementHint(answers: PackagePlacementAnswers): string {
-  const parts: string[] = []
-  if (answers.hostInvolved) {
-    parts.push('hosted', 'host involved', 'concierge')
-  } else {
-    parts.push('autonomous', 'self-service stay', 'not hosted')
-  }
-  if (answers.runSpecial) {
-    parts.push('special', 'promotion', 'limited-time offer')
-  }
-  if (answers.exclusive) {
-    parts.push('exclusive', 'pro entitlement', 'pro members only')
-  } else {
-    parts.push(
-      'publicly accessible',
-      'non-member',
-      'guests without subscription',
-      'entitlement none',
-    )
-  }
-  if (answers.onceOff) {
-    parts.push('addon', 'once-off', 'one-time purchase', 'extra service')
-  } else {
-    parts.push('stay package', 'nightly or weekly stay', 'not addon')
-  }
-  return parts.join(', ')
+  const { category, entitlement } = resolvePlacementTargets(answers)
+  return `${PLACEMENT_JSON_MARKER}${JSON.stringify(answers)} required category=${category} entitlement=${entitlement}`
 }
 
 export function buildSuggestPackagesMessage(postId: string, answers: PackagePlacementAnswers): string {
-  const hint = buildPlacementHint(answers)
+  const { category, entitlement } = resolvePlacementTargets(answers)
   return (
-    `For postId "${postId}": CALL suggestCatalogPackages NOW with this hint: ${hint}. ` +
-    `Return 1–4 catalog package ideas I can approve.`
+    `For postId "${postId}": CALL suggestCatalogPackages NOW. ` +
+    `Required: category "${category}", entitlement "${entitlement}". ` +
+    `Hint: ${buildPlacementHint(answers)}`
   )
 }
 
 export function applyPlacementOverrides<T extends { details?: Record<string, unknown> }>(
   recommendations: T[],
   hint?: string,
+  placement?: PackagePlacementAnswers | null,
 ): T[] {
+  const structured = placement ?? parsePlacementFromHint(hint)
+  if (structured) {
+    const { category, entitlement } = resolvePlacementTargets(structured)
+    return recommendations.map((r) => ({
+      ...r,
+      details: {
+        ...(r.details || {}),
+        category,
+        customerTierRequired: entitlement,
+      },
+    }))
+  }
+
   if (!hint?.trim()) return recommendations
   const h = hint.toLowerCase()
   const hostInvolved =
-    /\bhosted\b|host involved|concierge|i'll be involved|involved host/.test(h) &&
-    !/\bautonomous\b|self-service|not hosted/.test(h)
-  const autonomous = /\bautonomous\b|self-service|not hosted/.test(h) && !hostInvolved
+    /\bhosted\b|host involved|concierge/.test(h) && !/\bautonomous\b|self-service|not hosted/.test(h)
   const wantsNonMember =
-    /non-?member|without (a )?subscription|guests without|unsubscribed|not subscribed|publicly accessible|open to everyone|entitlement none/.test(
+    /non-?member|without (a )?subscription|guests without|publicly accessible|open to everyone|entitlement none/.test(
       h,
-    )
+    ) && !/\bexclusive\b|pro entitlement|pro members/.test(h)
   const wantsPro = /\bexclusive\b|pro entitlement|pro members/.test(h)
-  const wantsHosted = hostInvolved || /\bhosted\b|concierge/.test(h)
+  const wantsHosted = hostInvolved
   const wantsAddon =
-    /\baddon\b|add-?on|once[- ]?off|one[- ]?time|once-off purchase|extra service|cleaning|tour/.test(h)
-  const wantsSpecial =
-    /\bspecial\b|promo|promotion|limited[- ]?time|run a special/.test(h)
+    /(?<!not )\baddon\b|add-?on|once[- ]?off purchase|one[- ]?time purchase/.test(h)
+  const wantsSpecial = /\bspecial\b|promotion|limited[- ]?time/.test(h)
 
   return recommendations.map((r) => {
     const details = { ...(r.details || {}) } as Record<string, unknown>
     if (wantsAddon) details.category = 'addon'
-    else if (wantsHosted && !wantsAddon) details.category = 'hosted'
+    else if (wantsHosted) details.category = 'hosted'
     else if (wantsSpecial) details.category = 'special'
-    else if (autonomous && !wantsSpecial) details.category = 'standard'
 
     if (wantsPro) details.customerTierRequired = 'pro'
     else if (wantsNonMember) details.customerTierRequired = 'none'
-    else if (wantsSpecial && wantsNonMember) details.customerTierRequired = 'none'
 
     return { ...r, details }
   })
