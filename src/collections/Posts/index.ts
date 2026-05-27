@@ -272,6 +272,16 @@ export const Posts: CollectionConfig<'posts'> = {
       },
     },
     {
+      name: 'airbnbCalendarUrl',
+      type: 'text',
+      label: 'Airbnb iCal URL',
+      admin: {
+        position: 'sidebar',
+        description:
+          'Public iCal feed URL exported from Airbnb (e.g., https://www.airbnb.co.za/calendar/ical/....ics). This calendar will be checked for availability alongside bookings.',
+      },
+    },
+    {
       name: 'wifi',
       type: 'text',
       label: 'WiFi details',

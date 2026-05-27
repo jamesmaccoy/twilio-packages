@@ -1,6 +1,12 @@
 import { Endpoint } from 'payload'
 import { parseICalFeed } from '@/utilities/parseICalFeed'
 
+const toISODateOnly = (date: Date): string => {
+  const iso = date.toISOString()
+  const idx = iso.indexOf('T')
+  return idx === -1 ? iso : iso.slice(0, idx)
+}
+
 export const checkAvailability: Endpoint = {
   method: 'get',
   path: '/check-availability',
@@ -17,7 +23,7 @@ export const checkAvailability: Endpoint = {
     }
 
     try {
-      let resolvedPostId = postId
+      let resolvedPostId = typeof postId === 'string' ? postId : undefined
       const targetPackageId = typeof packageId === 'string' ? packageId : undefined
 
       // If slug is provided, find the post by slug
@@ -34,6 +40,7 @@ export const checkAvailability: Endpoint = {
             id: true,
             slug: true,
             googleCalendarUrl: true,
+            airbnbCalendarUrl: true,
           },
           limit: 1,
         })
@@ -43,7 +50,10 @@ export const checkAvailability: Endpoint = {
         }
 
         post = posts.docs[0]
-        resolvedPostId = post.id
+        const pid =
+          typeof post?.id === 'string' || typeof post?.id === 'number' ? String(post.id) : undefined
+        if (!pid) return Response.json({ message: 'Post not found' }, { status: 404 })
+        resolvedPostId = pid
       } else if (resolvedPostId) {
         // Fetch post to get Google Calendar URL
         post = await req.payload.findByID({
@@ -52,8 +62,15 @@ export const checkAvailability: Endpoint = {
           select: {
             id: true,
             googleCalendarUrl: true,
+            airbnbCalendarUrl: true,
           },
         })
+      }
+
+      const finalPostId: string | undefined = resolvedPostId || (post?.id ? String(post.id) : undefined)
+
+      if (!finalPostId) {
+        return Response.json({ message: 'Post not found' }, { status: 404 })
       }
 
       // Parse the requested date range
@@ -74,7 +91,7 @@ export const checkAvailability: Endpoint = {
           date.getUTCMonth(),
           date.getUTCDate()
         ))
-        return utcDate.toISOString().split('T')[0]
+        return toISODateOnly(utcDate)
       }
       
       // Normalize to ISO date strings for consistent database comparison
@@ -138,7 +155,7 @@ export const checkAvailability: Endpoint = {
       // The overlap condition: booking.fromDate < request.endDate AND booking.toDate > request.startDate
       // Exclude cancelled bookings - they free up dates for other customers
       const whereConditions: Record<string, any>[] = [
-        { post: { equals: resolvedPostId } },
+        { post: { equals: finalPostId } },
         { fromDate: { less_than: endISO } },
         { toDate: { greater_than: startISO } },
         {
@@ -233,7 +250,7 @@ export const checkAvailability: Endpoint = {
           const requestedDates: string[] = []
           const currentDate = new Date(requestStart)
           while (currentDate < requestEnd) {
-            const dateISO = currentDate.toISOString().split('T')[0]
+            const dateISO = toISODateOnly(currentDate)
             requestedDates.push(dateISO)
             currentDate.setUTCDate(currentDate.getUTCDate() + 1)
           }
@@ -250,8 +267,33 @@ export const checkAvailability: Endpoint = {
         }
       }
 
+      // Check Airbnb Calendar availability if configured
+      let hasAirbnbCalendarConflict = false
+      if (post?.airbnbCalendarUrl) {
+        try {
+          console.log('📅 Checking Airbnb Calendar for conflicts:', post.airbnbCalendarUrl)
+          const airbnbCalendarDates = await parseICalFeed(post.airbnbCalendarUrl)
+          const requestedDates: string[] = []
+          const currentDate = new Date(requestStart)
+          while (currentDate < requestEnd) {
+            const dateISO = toISODateOnly(currentDate)
+            requestedDates.push(dateISO)
+            currentDate.setUTCDate(currentDate.getUTCDate() + 1)
+          }
+          hasAirbnbCalendarConflict = requestedDates.some((date) => airbnbCalendarDates.includes(date))
+          if (hasAirbnbCalendarConflict) {
+            console.log('❌ Airbnb Calendar conflict detected for requested dates')
+          }
+        } catch (error) {
+          console.error('Error checking Airbnb Calendar availability:', error)
+        }
+      }
+
       // If any bookings were found OR Google Calendar has conflicts, the dates are not available
-      const isAvailable = conflictingBookings.length < concurrencyLimit && !hasGoogleCalendarConflict
+      const isAvailable =
+        conflictingBookings.length < concurrencyLimit &&
+        !hasGoogleCalendarConflict &&
+        !hasAirbnbCalendarConflict
 
       // If unavailable, find suggested available dates
       let suggestedDates: Array<{ startDate: string; endDate: string; duration: number }> = []
@@ -263,7 +305,7 @@ export const checkAvailability: Endpoint = {
         const allBookings = await req.payload.find({
           collection: 'bookings',
           where: {
-            post: { equals: resolvedPostId },
+            post: { equals: finalPostId },
           },
           select: {
             fromDate: true,
@@ -274,12 +316,19 @@ export const checkAvailability: Endpoint = {
         })
 
         // Get Google Calendar dates if configured
-        let googleCalendarDates: string[] = []
+        const externalCalendarDates = new Set<string>()
         if (post?.googleCalendarUrl) {
           try {
-            googleCalendarDates = await parseICalFeed(post.googleCalendarUrl)
+            ;(await parseICalFeed(post.googleCalendarUrl)).forEach((d) => externalCalendarDates.add(d))
           } catch (error) {
             console.error('Error fetching Google Calendar dates for suggestions:', error)
+          }
+        }
+        if (post?.airbnbCalendarUrl) {
+          try {
+            ;(await parseICalFeed(post.airbnbCalendarUrl)).forEach((d) => externalCalendarDates.add(d))
+          } catch (error) {
+            console.error('Error fetching Airbnb Calendar dates for suggestions:', error)
           }
         }
 
@@ -292,7 +341,7 @@ export const checkAvailability: Endpoint = {
             toDate: new Date(b.toDate),
           })),
           3, // Suggest up to 3 alternative date ranges
-          googleCalendarDates // Pass Google Calendar dates to avoid conflicts
+          [...externalCalendarDates] // Avoid external calendar conflicts
         )
       }
 
@@ -306,7 +355,9 @@ export const checkAvailability: Endpoint = {
           concurrencyLimit,
           conflictingCount: conflictingBookings.length,
           hasGoogleCalendarConflict,
+          hasAirbnbCalendarConflict,
           hasGoogleCalendar: !!post?.googleCalendarUrl,
+          hasAirbnbCalendar: !!post?.airbnbCalendarUrl,
         },
         suggestedDates: suggestedDates.length > 0 ? suggestedDates : undefined,
       })
@@ -368,7 +419,7 @@ function findAvailableDateRanges(
       const testDates: string[] = []
       const currentDate = new Date(testStart)
       while (currentDate < testEnd) {
-        const dateISO = currentDate.toISOString().split('T')[0]
+        const dateISO = toISODateOnly(currentDate)
         testDates.push(dateISO)
         currentDate.setUTCDate(currentDate.getUTCDate() + 1)
       }
@@ -392,8 +443,8 @@ function findAvailableDateRanges(
 
     if (!hasConflict(testStart, testEnd)) {
       suggestions.push({
-        startDate: testStart.toISOString().split('T')[0],
-        endDate: testEnd.toISOString().split('T')[0],
+        startDate: toISODateOnly(testStart),
+        endDate: toISODateOnly(testEnd),
         duration,
       })
     }
@@ -410,8 +461,8 @@ function findAvailableDateRanges(
 
     if (!hasConflict(testStart, testEnd)) {
       suggestions.push({
-        startDate: testStart.toISOString().split('T')[0],
-        endDate: testEnd.toISOString().split('T')[0],
+        startDate: toISODateOnly(testStart),
+        endDate: toISODateOnly(testEnd),
         duration,
       })
     }

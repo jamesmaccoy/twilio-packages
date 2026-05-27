@@ -41,6 +41,7 @@ export const unavailableDates: Endpoint = {
             id: true,
             slug: true,
             googleCalendarUrl: true,
+            airbnbCalendarUrl: true,
           },
           limit: 1,
         })
@@ -59,6 +60,7 @@ export const unavailableDates: Endpoint = {
           select: {
             id: true,
             googleCalendarUrl: true,
+            airbnbCalendarUrl: true,
           },
         })
       }
@@ -295,30 +297,40 @@ export const unavailableDates: Endpoint = {
       // Remove duplicates if needed
       const uniqueUnavailableDates = [...new Set(unavailableDates)]
 
-      // Fetch unavailable dates from Google Calendar if configured
-      let googleCalendarDates: string[] = []
+      // Fetch unavailable dates from external calendars (Google / Airbnb) if configured
+      const externalCalendarDates = new Set<string>()
+
       if (post?.googleCalendarUrl) {
         try {
           console.log('📅 Fetching Google Calendar dates from:', post.googleCalendarUrl)
-          googleCalendarDates = await parseICalFeed(post.googleCalendarUrl)
-          
-          if (googleCalendarDates.length > 0) {
-            console.log(`📅 Found ${googleCalendarDates.length} unavailable dates from Google Calendar`)
-          }
+          ;(await parseICalFeed(post.googleCalendarUrl)).forEach((d) => externalCalendarDates.add(d))
         } catch (error) {
           console.error('Error fetching Google Calendar dates:', error)
-          // Continue without Google Calendar dates if fetch fails
         }
       }
 
-      // Merge dates from both sources (bookings + Google Calendar)
-      const allUnavailableDates = [...uniqueUnavailableDates, ...googleCalendarDates]
+      if (post?.airbnbCalendarUrl) {
+        try {
+          console.log('📅 Fetching Airbnb Calendar dates from:', post.airbnbCalendarUrl)
+          ;(await parseICalFeed(post.airbnbCalendarUrl)).forEach((d) => externalCalendarDates.add(d))
+        } catch (error) {
+          console.error('Error fetching Airbnb Calendar dates:', error)
+        }
+      }
+
+      const mergedExternalDates = [...externalCalendarDates]
+      if (mergedExternalDates.length > 0) {
+        console.log(`📅 Found ${mergedExternalDates.length} unavailable dates from external calendars`)
+      }
+
+      // Merge dates from both sources (bookings + external calendars)
+      const allUnavailableDates = [...uniqueUnavailableDates, ...mergedExternalDates]
       const finalUnavailableDates = [...new Set(allUnavailableDates)].sort()
 
       console.log('📅 Final unavailable dates summary:', {
         totalUnavailableDates: finalUnavailableDates.length,
         bookingDates: uniqueUnavailableDates.length,
-        googleCalendarDates: googleCalendarDates.length,
+        externalCalendarDates: mergedExternalDates.length,
         unavailableDates: finalUnavailableDates.slice(0, 10), // Show first 10
         totalBookingsProcessed: bookings.docs.length,
         totalPackagesFound: packages.docs.length,
@@ -327,6 +339,7 @@ export const unavailableDates: Endpoint = {
           limit,
         })),
         hasGoogleCalendar: !!post?.googleCalendarUrl,
+        hasAirbnbCalendar: !!post?.airbnbCalendarUrl,
       })
 
       return Response.json({

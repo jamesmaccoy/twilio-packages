@@ -32,6 +32,7 @@ export async function parseICalFeed(icalUrl: string): Promise<string[]> {
     let currentEvent: {
       dtstart?: string
       dtend?: string
+      duration?: string
     } | null = null
     
     for (let i = 0; i < lines.length; i++) {
@@ -56,13 +57,23 @@ export async function parseICalFeed(icalUrl: string): Promise<string[]> {
       if (fullLine.startsWith('BEGIN:VEVENT')) {
         currentEvent = {}
       } else if (fullLine.startsWith('END:VEVENT')) {
-        if (currentEvent && currentEvent.dtstart && currentEvent.dtend) {
-          // Parse dates and add all dates in the range to unavailable dates
+        if (currentEvent?.dtstart) {
+          // Parse dates and add all dates in the range to unavailable dates.
+          // Important: timed events can start/end on the same date (e.g. 12:00–16:00),
+          // but they should still block that calendar day for availability purposes.
           const startDate = parseICalDate(currentEvent.dtstart)
-          const endDate = parseICalDate(currentEvent.dtend)
-          
-          if (startDate && endDate) {
-            // Generate all dates in the range (excluding check-out date)
+          let endDate =
+            currentEvent.dtend ? parseICalDate(currentEvent.dtend) : null
+
+          if (startDate) {
+            // If DTEND is missing/invalid or ends before/at DTSTART at "date" granularity,
+            // treat it as a 1-day event to avoid generating an empty blocked range.
+            if (!endDate || endDate.getTime() <= startDate.getTime()) {
+              endDate = new Date(startDate)
+              endDate.setUTCDate(endDate.getUTCDate() + 1)
+            }
+
+            // Generate all dates in the range (excluding check-out date).
             const currentDate = new Date(startDate)
             while (currentDate < endDate) {
               const dateISO = currentDate.toISOString().split('T')[0]
@@ -83,6 +94,11 @@ export async function parseICalFeed(icalUrl: string): Promise<string[]> {
           const value = extractICalValue(fullLine)
           if (value) {
             currentEvent.dtend = value
+          }
+        } else if (fullLine.startsWith('DURATION')) {
+          const value = extractICalValue(fullLine)
+          if (value) {
+            currentEvent.duration = value
           }
         }
       }
@@ -117,8 +133,7 @@ function extractICalValue(line: string): string | null {
  */
 function parseICalDate(dateStr: string): Date | null {
   try {
-    // Remove any parameters (e.g., DTSTART;VALUE=DATE:20240101)
-    const value = dateStr.split(':').pop()?.trim()
+    const value = dateStr.trim()
     if (!value) return null
     
     // Handle date-time format (YYYYMMDDTHHmmssZ or YYYYMMDDTHHmmss)
@@ -145,8 +160,8 @@ function parseICalDate(dateStr: string): Date | null {
       if (value.endsWith('Z')) {
         return new Date(Date.UTC(year, month, day, hour, minute, second))
       } else {
-        // Assume local time if no timezone specified
-        return new Date(year, month, day, hour, minute, second)
+        // If no timezone specified, treat it as UTC to keep date-only comparisons stable.
+        return new Date(Date.UTC(year, month, day, hour, minute, second))
       }
     } else {
       // Handle date-only format (YYYYMMDD)
