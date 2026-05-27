@@ -16,6 +16,7 @@ import { PostHeroWrapper } from '@/heros/PostHero/PostHeroWrapper'
 import { generateMeta } from '@/utilities/generateMeta'
 import PageClient from './page.client'
 import { LivePreviewListener } from '@/components/LivePreviewListener'
+import { getPostPackageAccessIndex } from '@/lib/post-package-access'
 
 export async function generateStaticParams() {
   const payload = await getPayload({ config: configPromise })
@@ -57,6 +58,9 @@ export default async function Post({ params: paramsPromise }: Args) {
   const postBaseRate = typeof post.baseRate === 'number' ? post.baseRate : 0
   const postDescription = post.meta?.description || ''
 
+  const payload = await getPayload({ config: configPromise })
+  const packageAccess = await getPostPackageAccessIndex(payload, postId, post)
+
   // Ensure all required post properties are available
   const postForClient = {
     id: postId,
@@ -88,6 +92,7 @@ export default async function Post({ params: paramsPromise }: Args) {
             baseRate={postBaseRate}
             postTitle={postTitle}
             postDescription={postDescription}
+            guestBookable={packageAccess.guestBookable}
             relatedPosts={post.relatedPosts 
               ? post.relatedPosts.map((rp: any) => 
                   typeof rp === 'object' && rp !== null
@@ -98,7 +103,10 @@ export default async function Post({ params: paramsPromise }: Args) {
             postContent={post.content}
           />
         </Suspense>
-        <PostContentPreview post={post as Post} />
+        <PostContentPreview
+          post={post as Post}
+          guestBookable={packageAccess.guestBookable}
+        />
           {post.relatedPosts && post.relatedPosts.length > 0 && (
             <RelatedPosts
               className="mt-12 max-w-[52rem] lg:grid lg:grid-cols-subgrid col-start-1 col-span-3 grid-rows-[2fr]"

@@ -87,9 +87,11 @@ const getContentPreview = (post: Post): string[] => {
 
 export const PostContentPreview: React.FC<{
   post: Post
-}> = ({ post }) => {
+  /** From server index — avoids subscribe gate flash before /api/packages loads */
+  guestBookable?: boolean
+}> = ({ post, guestBookable: guestBookableFromServer }) => {
   const { isSubscribed, isLoading: isSubscriptionLoading } = useSubscription()
-  const [hasGuestPackage, setHasGuestPackage] = useState(false)
+  const [hasGuestPackage, setHasGuestPackage] = useState(guestBookableFromServer ?? false)
 
   // Get content preview for non-subscribers
   const contentPreview = useMemo(() => getContentPreview(post), [post])
@@ -97,9 +99,14 @@ export const PostContentPreview: React.FC<{
     !isSubscriptionLoading && !isSubscribed && !hasGuestPackage && contentPreview.length > 0
 
   useEffect(() => {
+    if (guestBookableFromServer === true) {
+      setHasGuestPackage(true)
+      return
+    }
+
     const postId = (post as any)?.id
     if (!postId) {
-      setHasGuestPackage(false)
+      setHasGuestPackage(guestBookableFromServer ?? false)
       return
     }
 
@@ -108,19 +115,22 @@ export const PostContentPreview: React.FC<{
       .then((res) => res.json())
       .then((data) => {
         if (isCancelled) return
+        if (typeof data?.access?.guestBookable === 'boolean') {
+          setHasGuestPackage(data.access.guestBookable)
+          return
+        }
         const packages = Array.isArray(data?.packages) ? data.packages : []
-        // Hide the member-only gate when at least one package is explicitly entitlement=none (bookable without subscription).
         const hasEligibleGuestPackage = packages.some((pkg: any) => isPublicBookablePackage(pkg))
         setHasGuestPackage(hasEligibleGuestPackage)
       })
       .catch(() => {
-        if (!isCancelled) setHasGuestPackage(false)
+        if (!isCancelled) setHasGuestPackage(guestBookableFromServer ?? false)
       })
 
     return () => {
       isCancelled = true
     }
-  }, [post])
+  }, [post, guestBookableFromServer])
 
   // Get category label (first category)
   const categoryLabel = post.categories && Array.isArray(post.categories) && post.categories.length > 0

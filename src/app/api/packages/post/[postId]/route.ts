@@ -4,10 +4,12 @@ import configPromise from '@/payload.config'
 import { yocoService } from '@/lib/yocoService'
 import {
   getCustomerEntitlement,
+  isPublicBookablePackage,
   normalizePackageEntitlement,
   type CustomerEntitlement,
 } from '@/utils/packageSuggestions'
 import { hasPackageCategory } from '@/utils/packageCategories'
+import { getPostPackageAccessIndex } from '@/lib/post-package-access'
 import jwt from 'jsonwebtoken'
 
 async function getAuthedUser(payload: any, request: NextRequest): Promise<any | null> {
@@ -390,9 +392,19 @@ export async function GET(
       }))
     })
 
+    const accessIndex = await getPostPackageAccessIndex(payload, postId, postData)
+    const guestBookableFromCombined = combinedPackages.some((pkg: any) =>
+      isPublicBookablePackage(pkg),
+    )
+
     const response = NextResponse.json({
       packages: allPackages,
-      total: allPackages.length
+      total: allPackages.length,
+      access: {
+        guestBookable: accessIndex.guestBookable || guestBookableFromCombined,
+        minEntitlement: accessIndex.minEntitlement,
+        primaryCategory: accessIndex.primaryCategory,
+      },
     })
 
     // Disable caching temporarily to debug - results vary by user entitlement

@@ -77,6 +77,8 @@ interface SmartEstimateBlockProps {
   postDescription?: string
   relatedPosts?: Array<{ id?: string; title?: string; slug?: string } | string>
   postContent?: any
+  /** Server index: post has at least one guest-bookable (entitlement=none) package */
+  guestBookable?: boolean
 }
 
 const QuickActions = ({ 
@@ -212,7 +214,8 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
   postTitle = "this property",
   postDescription = "",
   relatedPosts = [],
-  postContent
+  postContent,
+  guestBookable: guestBookableFromServer,
 }) => {
   const { currentUser } = useUserContext()
   const isLoggedIn = !!currentUser
@@ -323,7 +326,9 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
   // Package loading state to prevent multiple API calls
   const [loadingPackages, setLoadingPackages] = useState(false)
   const [packagesLoaded, setPackagesLoaded] = useState(false)
-  const [hasPublicBookablePackages, setHasPublicBookablePackages] = useState(false)
+  const [hasPublicBookablePackages, setHasPublicBookablePackages] = useState(
+    guestBookableFromServer ?? false,
+  )
   
   // Ref to track loading state to prevent infinite loops
   const loadingRef = useRef(false)
@@ -3427,11 +3432,27 @@ ${parsedDates.startDate && parsedDates.endDate ? `\nIMPORTANT: User just request
     }
   }, [postId, currentUser?.id])
 
-  // For non-subscribers, only show the assistant when at least one package has entitlement=none.
-  // (Otherwise we show the member-only gate instead of an empty assistant.)
-  if (!isSubscriptionLoading && !isSubscribed) {
-    if (!loadedRef.current) return null
-    if (!hasPublicBookablePackages) return null
+  // Avoid layout jumps: wait for subscription, then use server index + client package load.
+  if (isSubscriptionLoading) {
+    return null
+  }
+
+  if (!isSubscribed) {
+    if (guestBookableFromServer === false) {
+      return null
+    }
+
+    const guestAssistantAllowed =
+      Boolean(guestBookableFromServer) || hasPublicBookablePackages
+
+    if (!guestAssistantAllowed) {
+      if (!loadedRef.current) return null
+      return null
+    }
+
+    if (!loadedRef.current && !guestBookableFromServer) {
+      return null
+    }
   }
   
   return (
