@@ -569,12 +569,18 @@ Rules:
         depth: 2,
         sort: '-createdAt',
       }),
-      // Fetch all packages to provide recommendations and enabled status
+      // Fetch packages for recommendations.
+      // If the chat has a property context, scope to that post so we don't miss relevant packages due to paging.
       payload.find({
         collection: 'packages',
+        where: bookingContext?.postId
+          ? ({
+              post: { equals: bookingContext.postId },
+            } as any)
+          : undefined,
         depth: 2,
         sort: 'name',
-        limit: 100, // Get a good sample of packages
+        limit: bookingContext?.postId ? 500 : 200,
       }),
     ])
 
@@ -635,6 +641,7 @@ Rules:
       description: pkg.description,
       isEnabled: pkg.isEnabled,
       category: pkg.category,
+      entitlement: (pkg as any).entitlement,
       multiplier: pkg.multiplier,
       minNights: pkg.minNights,
       maxNights: pkg.maxNights,
@@ -1390,7 +1397,10 @@ USER'S DATA:
 - Total Bookings: ${userContext.bookings.length}
 - Recent Estimates: ${userContext.estimates.length}
  - Available Packages: ${packagesInfo.length}
- - Available Addons: ${packagesInfo.filter(pkg => pkg.category === 'addon' && pkg.isEnabled).length}
+ - Available Addons: ${packagesInfo.filter(pkg => {
+    const categories = Array.isArray((pkg as any).category) ? (pkg as any).category : [(pkg as any).category].filter(Boolean)
+    return categories.includes('addon') && pkg.isEnabled
+  }).length}
  - Page Summary: ${userContext.currentBooking?.postDetails?.description || 'No additional property summary'}
 
 INSTRUCTIONS:
