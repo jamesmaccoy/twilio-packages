@@ -211,6 +211,60 @@ NEXT_PUBLIC_URL=https://www.simpleplek.co.za  # Production URL
    - Description: "Custom description"
    - Expected: Uses provided name and description
 
+6. **Entitlement + Add-on Visibility (SmartEstimateBlock)**
+
+**Goal**: Ensure the build only presents packages that match the viewer’s entitlement and that add-ons are suggested/visible for **standard** entitlement (but not **pro** add-ons). Also ensure **no-subscription** users only see `none` entitlement packages (and similarly only `none` entitlement add-ons).
+
+#### Setup
+- Pick a post with packages and add-ons. You’ll need its `postId` (example: `692d80fd22ec2d684a81b164`).
+- Ensure there exist packages with these entitlements:
+  - At least **one** package with `entitlement: ['none']` (public / non-member)
+  - At least **one** package with `entitlement: ['standard']`
+  - At least **one** package with `entitlement: ['pro']`
+  - At least **one** add-on package (category includes `addon`) with `entitlement: ['standard']`
+  - At least **one** add-on package (category includes `addon`) with `entitlement: ['pro']` (this must never show to standard)
+
+> Note: In this repo, `packages.category` and `packages.entitlement` are `hasMany` arrays in Payload, so the API/UI must treat them as arrays.
+
+#### Test users
+- **User A (no subscription)**: `subscriptionStatus.status !== 'active'` OR expired
+- **User B (standard/basic)**: `subscriptionStatus.status = 'active'`, `subscriptionStatus.plan = 'basic'` (treated as standard)
+- **User C (pro)**: `subscriptionStatus.status = 'active'`, `subscriptionStatus.plan = 'pro'`
+
+#### Verify API behavior (per user)
+1) **Packages shown on a post**:
+- Request: `GET /api/packages/post/<postId>`
+- Expectations:
+  - **User A**: only packages where entitlement includes `none`
+  - **User B**: only packages where entitlement includes `standard`
+  - **User C**: packages where entitlement includes `standard` OR `pro`
+  - **All users**: packages with category including `addon` must NOT be returned here
+
+2) **Add-ons for a post**:
+- Request: `GET /api/packages/addons/<postId>`
+- Expectations:
+  - **User A**: only add-ons where entitlement includes `none`
+  - **User B**: only add-ons where entitlement includes `none` OR `standard` (and NEVER `pro`)
+  - **User C**: add-ons where entitlement includes `none` OR `standard` OR `pro`
+  - **All users**: every item returned must have category including `addon`
+
+#### Verify UI behavior (SmartEstimateBlock)
+Open the post page:
+- `GET /posts/<slug>` (or navigate in browser)
+
+Expectations:
+- **User A (no subscription)**:
+  - Member gate should appear unless there is at least one `entitlement=none` package (public bookable).
+  - SmartEstimateBlock should only appear when at least one package has `entitlement=none`.
+  - Add-on suggestions should only include `entitlement=none` add-ons.
+- **User B (standard/basic)**:
+  - SmartEstimateBlock should show standard packages.
+  - Add-on suggestions should include `entitlement=standard` add-ons.
+  - Pro add-ons must NOT appear.
+- **User C (pro)**:
+  - Can see standard + pro packages.
+  - Can see pro add-ons.
+
 ### Manual Testing Checklist
 
 - [ ] Server is running (`http://localhost:3000`)
