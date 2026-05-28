@@ -321,8 +321,8 @@ export interface Package {
         id?: string | null;
       }[]
     | null;
-  category?: ('standard' | 'hosted' | 'addon' | 'special') | null;
-  entitlement?: ('none' | 'standard' | 'pro') | null;
+  category?: ('standard' | 'hosted' | 'addon' | 'special')[] | null;
+  entitlement?: ('none' | 'standard' | 'pro')[] | null;
   /**
    * Minimum nights. Use 0.5 for hourly/half-day packages, 1 for nightly packages.
    */
@@ -400,6 +400,10 @@ export interface Post {
    * Public iCal feed URL for Google Calendar (e.g., https://calendar.google.com/calendar/ical/.../public/basic.ics). This calendar will be checked for availability alongside bookings.
    */
   googleCalendarUrl?: string | null;
+  /**
+   * Public iCal feed URL exported from Airbnb (e.g., https://www.airbnb.co.za/calendar/ical/....ics). This calendar will be checked for availability alongside bookings.
+   */
+  airbnbCalendarUrl?: string | null;
   /**
    * Network name and password for guests (shared in the booking assistant and house manual context).
    */
@@ -1732,6 +1736,7 @@ export interface PostsSelect<T extends boolean = true> {
       };
   baseRate?: T;
   googleCalendarUrl?: T;
+  airbnbCalendarUrl?: T;
   wifi?: T;
   lockbox?: T;
   packageSettings?:
