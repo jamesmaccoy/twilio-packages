@@ -1081,22 +1081,6 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
                                   />
                                 </div>
                               </div>
-                              <div>
-                                <label className="text-sm font-medium text-slate-600 dark:text-muted-foreground">Custom Display Name</label>
-                                <Input
-                                  value={editingPackage.customName || ''}
-                                  onChange={e => setEditingPackage({ ...editingPackage, customName: e.target.value })}
-                                  className="mt-1"
-                                  placeholder="Override display name"
-                                />
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Switch
-                                  checked={editingPackage.isEnabled}
-                                  onCheckedChange={checked => setEditingPackage({ ...editingPackage, isEnabled: checked })}
-                                />
-                                <label className="text-sm font-medium">Enabled</label>
-                              </div>
                               {editingPackage.revenueCatId && (
                                 <div className="text-xs text-slate-400 dark:text-muted-foreground">
                                   RevenueCat ID: {editingPackage.revenueCatId}
@@ -1140,8 +1124,6 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
                                   handleFieldChange(editingPackage.id, 'maxNights', editingPackage.maxNights);
                                   handleFieldChange(editingPackage.id, 'multiplier', editingPackage.multiplier);
                                   handleFieldChange(editingPackage.id, 'baseRate', editingPackage.baseRate);
-                                  handleFieldChange(editingPackage.id, 'customName', editingPackage.customName);
-                                  handleFieldChange(editingPackage.id, 'isEnabled', editingPackage.isEnabled);
                                   setEditingPackage(null);
                                 }
                               }}
