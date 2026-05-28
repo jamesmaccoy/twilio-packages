@@ -160,10 +160,12 @@ Rules:
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error'
 		console.error('Error details:', errorMessage)
 		console.error('Error stack:', error instanceof Error ? error.stack : undefined)
+		// Provider outages / rate limits shouldn't break the booking UI.
+		// Return 200 with an empty list so the client can fall back to non-AI behavior.
 		return NextResponse.json({
 			recommendations: [],
 			error: errorMessage,
 			details: error instanceof Error ? error.stack : undefined
-		}, { status: 500 })
+		}, { status: 200 })
 	}
 } 

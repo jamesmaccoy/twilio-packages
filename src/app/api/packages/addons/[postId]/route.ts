@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import configPromise from '@/payload.config'
 import { yocoService } from '@/lib/yocoService'
+import { hasPackageCategory } from '@/utils/packageCategories'
+import {
+  normalizePackageEntitlements,
+  packageVisibleToCustomer,
+  type CustomerEntitlement,
+} from '@/utils/packageSuggestions'
 
 export async function GET(
   request: NextRequest,
@@ -33,6 +39,24 @@ export async function GET(
     } catch (error) {
       console.log('Failed to fetch post data for custom names, continuing without custom names')
     }
+
+    // Determine customer entitlement (for addon gating).
+    // NOTE: Payload's `users` collection read access is adminOrSelf; we rely on payload.auth() user object here.
+    const customerEntitlement: CustomerEntitlement = (() => {
+      if (!user) return 'none'
+      const role = (user as any)?.role
+      const roleArray = Array.isArray(role) ? role : role ? [role] : []
+      if (roleArray.includes('admin')) return 'pro'
+
+      const sub = (user as any)?.subscriptionStatus
+      const status = sub?.status
+      const expiresAt = sub?.expiresAt
+      const plan = String(sub?.plan || '').toLowerCase()
+      const now = new Date()
+      const notExpired = !expiresAt || (typeof expiresAt === 'string' && new Date(expiresAt) > now)
+      if (status === 'active' && notExpired) return plan === 'pro' ? 'pro' : 'standard'
+      return 'none'
+    })()
 
     // Get addon packages from database (filter by category 'addon')
     const dbPackages = await payload.find({
@@ -118,6 +142,7 @@ export async function GET(
         description: pkg.description,
         multiplier: pkg.multiplier,
         category: pkg.category,
+        entitlement: (pkg as any).entitlement ?? null,
         minNights: pkg.minNights,
         maxNights: pkg.maxNights,
         revenueCatId: pkg.revenueCatId,
@@ -128,7 +153,18 @@ export async function GET(
         source: 'database',
         hasCustomName: !!customName
       }
-    }).filter(pkg => pkg.isEnabled)
+    })
+      .filter((pkg) => Boolean(pkg.isEnabled))
+      // Strictly require addon category, even if category is a hasMany array.
+      .filter((pkg) => hasPackageCategory(pkg.category as any, 'addon'))
+      // Enforce entitlement gating for signed-in customers.
+      .filter((pkg) =>
+        packageVisibleToCustomer({
+          packageEntitlement: (pkg as any).entitlement,
+          customerEntitlement,
+          hideNoneForPaying: false,
+        }),
+      )
 
     const yocoAddonPackages = yocoProducts
       .filter(product => product.category === 'addon')
@@ -143,6 +179,7 @@ export async function GET(
           description: product.description,
           multiplier: 1,
           category: product.category,
+          entitlement: (product as any).entitlement ?? null,
           minNights: duration,
           maxNights: duration,
           revenueCatId: product.id,
@@ -154,7 +191,14 @@ export async function GET(
           hasCustomName: !!customName
         }
       })
-      .filter(pkg => pkg.isEnabled)
+      .filter((pkg) => Boolean(pkg.isEnabled))
+      .filter((pkg) =>
+        packageVisibleToCustomer({
+          packageEntitlement: (pkg as any).entitlement,
+          customerEntitlement,
+          hideNoneForPaying: false,
+        }),
+      )
 
     const addonPackages = [...dbAddonPackages, ...yocoAddonPackages]
 
