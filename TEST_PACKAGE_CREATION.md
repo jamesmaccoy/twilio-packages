@@ -248,22 +248,70 @@ NEXT_PUBLIC_URL=https://www.simpleplek.co.za  # Production URL
   - **User C**: add-ons where entitlement includes `none` OR `standard` OR `pro`
   - **All users**: every item returned must have category including `addon`
 
-#### Verify UI behavior (SmartEstimateBlock)
+#### Verify UI behavior (SmartEstimateBlock + subscribe gate)
 Open the post page:
 - `GET /posts/<slug>` (or navigate in browser)
 
-Expectations:
-- **User A (no subscription)**:
-  - Member gate should appear unless there is at least one `entitlement=none` package (public bookable).
-  - SmartEstimateBlock should only appear when at least one package has `entitlement=none`.
-  - Add-on suggestions should only include `entitlement=none` add-ons.
-- **User B (standard/basic)**:
-  - SmartEstimateBlock should show standard packages.
-  - Add-on suggestions should include `entitlement=standard` add-ons.
-  - Pro add-ons must NOT appear.
-- **User C (pro)**:
-  - Can see standard + pro packages.
-  - Can see pro add-ons.
+> **Important**: `entitlement` and `category` are **arrays** in Payload (`hasMany: true`).  
+> A package with `entitlement: ['none']` is public bookable — not the string `"none"` alone in all code paths.
+
+##### When at least one non-addon package has `entitlement` including `none` (public bookable)
+
+Example: **The Shack** (`/posts/the-shack`)
+
+| Field | Example value |
+|-------|----------------|
+| Post slug | `the-shack` |
+| Post ID | `69e9d58f7647fb5dd596540b` |
+| Package ID | `69fc74ef099ac8a9850a2e71` |
+| Package API | `GET /api/packages/69fc74ef099ac8a9850a2e71?depth=2` (admin/host auth) |
+| Post packages API | `GET /api/packages/post/69e9d58f7647fb5dd596540b` |
+
+**User A (no subscription) — expected on `/posts/the-shack`:**
+
+| UI element | Expected |
+|------------|----------|
+| **Subscribe gate** (`PostContentPreview`) | **Hidden** — do not show “This plek is for members only” |
+| **SmartEstimateBlock** | **Visible** — AI Booking Assistant loads after subscription check |
+| **Packages in assistant** | Only packages whose `entitlement` array includes `none` (e.g. “🔥 Shack's Coastal Escape”) |
+| **Add-on suggestions** | Only add-ons whose `entitlement` includes `none` |
+
+**API check (logged out / User A):**
+
+```bash
+curl -s "http://localhost:3000/api/packages/post/69e9d58f7647fb5dd596540b" | jq '.access, .packages[].entitlement'
+```
+
+Expected:
+
+```json
+{
+  "guestBookable": true,
+  "minEntitlement": "none",
+  "primaryCategory": "standard"
+}
+```
+
+Packages array should include the shack package with `"entitlement": ["none"]`.
+
+**SSR index:** the post page passes `guestBookable={true}` from `getPostPackageAccessIndex()` so the UI does not flash gate → assistant → gate.
+
+##### When no package has `entitlement` including `none` (members only)
+
+**User A (no subscription):**
+
+| UI element | Expected |
+|------------|----------|
+| **Subscribe gate** | **Shown** (if the post has editorial preview content) |
+| **SmartEstimateBlock** | **Hidden** — no empty assistant |
+
+**User B (standard/basic):**
+- SmartEstimateBlock visible; packages where `entitlement` includes `standard` (not `none`-only packages unless also tagged `standard`).
+- Add-on suggestions: `none` or `standard`, never `pro`-only add-ons.
+
+**User C (pro):**
+- SmartEstimateBlock visible; packages where `entitlement` includes `standard` or `pro`.
+- Add-on suggestions: any add-on tier the user qualifies for.
 
 ### Manual Testing Checklist
 

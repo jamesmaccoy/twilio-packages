@@ -5,7 +5,6 @@ import { yocoService } from '@/lib/yocoService'
 import {
   getCustomerEntitlement,
   isPublicBookablePackage,
-  normalizePackageEntitlement,
   normalizePackageEntitlements,
   packageVisibleToCustomer,
   type CustomerEntitlement,
@@ -279,12 +278,13 @@ export async function GET(
         // For free-to-everyone packages (`entitlement: none`), do not hide them just because
         // a post has packageSettings entries (some posts have legacy settings with enabled=false).
         const entitlement = (pkg as any).entitlement
-        const dbEnabledForPost =
-          entitlement === 'none' ? true : isDbPackageEnabledForPost(pkg.id)
+        const dbEnabledForPost = normalizePackageEntitlements(entitlement).includes('none')
+          ? true
+          : isDbPackageEnabledForPost(pkg.id)
         const finalEnabled = pkg.isEnabled && dbEnabledForPost
         
         // Debug logging for special packages
-        if (pkg.category === 'special' || pkg.id === '68a58832420e4517de8d2bdb' || pkg.id === '68a587e7420e4517de8d2b2d') {
+        if (hasPackageCategory(pkg.category, 'special') || pkg.id === '68a58832420e4517de8d2bdb' || pkg.id === '68a587e7420e4517de8d2b2d') {
           console.log('🔍 Special package processing:', {
             id: pkg.id,
             name: pkg.name,

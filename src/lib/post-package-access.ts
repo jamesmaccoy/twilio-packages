@@ -1,6 +1,6 @@
 import type { Payload } from 'payload'
 import {
-  normalizePackageEntitlement,
+  normalizePackageEntitlements,
   type CustomerEntitlement,
 } from '@/utils/packageSuggestions'
 import { categoryPriorityScore, hasPackageCategory } from '@/utils/packageCategories'
@@ -24,7 +24,7 @@ function isPackageEnabledForPost(
   entitlement: unknown,
   packageSettings: PostPackageSettings,
 ): boolean {
-  if (normalizePackageEntitlement(entitlement) === 'none') {
+  if (normalizePackageEntitlements(entitlement).includes('none')) {
     return true
   }
   if (!packageSettings?.length) {
@@ -79,12 +79,14 @@ export async function getPostPackageAccessIndex(
     const entitlement = (pkg as { entitlement?: unknown }).entitlement
     if (!isPackageEnabledForPost(pkg.id, entitlement, packageSettings)) continue
 
-    const normalized = normalizePackageEntitlement(entitlement)
-    if (normalized === 'none') {
+    const normalizedList = normalizePackageEntitlements(entitlement)
+    if (normalizedList.includes('none')) {
       guestBookable = true
     }
-    if (entitlementRank(normalized) < entitlementRank(minEntitlement)) {
-      minEntitlement = normalized
+    for (const normalized of normalizedList) {
+      if (entitlementRank(normalized) < entitlementRank(minEntitlement)) {
+        minEntitlement = normalized
+      }
     }
 
     const score = categoryPriorityScore(pkg.category)
