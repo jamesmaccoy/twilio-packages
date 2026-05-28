@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import configPromise from '@/payload.config'
 import { sendPackageActivityNotification } from '@/lib/emailNotifications'
+import { hasPackageCategory } from '@/utils/packageCategories'
+import { packageVisibleToCustomer, type CustomerEntitlement } from '@/utils/packageSuggestions'
 import jwt from 'jsonwebtoken'
 
 async function getAuthedUser(payload: any, request: NextRequest): Promise<any | null> {
@@ -87,6 +89,41 @@ export async function GET(
     
     if (!packageDoc) {
       return NextResponse.json({ error: 'Package not found' }, { status: 404 })
+    }
+
+    // Defense-in-depth: even if a client knows a package id, don't leak pro/addon packages
+    // to users who shouldn't see them (customers/guests).
+    const role = (user as any)?.role
+    const roleArray = Array.isArray(role) ? role : role ? [role] : []
+    const isAdmin = roleArray.includes('admin')
+    const isHost = roleArray.includes('host')
+
+    if (!isAdmin && !isHost) {
+      // Customers/guests should never directly fetch addon packages.
+      if (hasPackageCategory((packageDoc as any)?.category, 'addon')) {
+        return NextResponse.json({ error: 'Not found' }, { status: 404 })
+      }
+
+      // Determine customer entitlement from user.subscriptionStatus (basic => standard).
+      const sub = (user as any)?.subscriptionStatus
+      const status = sub?.status
+      const expiresAt = sub?.expiresAt
+      const plan = String(sub?.plan || '').toLowerCase()
+      const now = new Date()
+      const notExpired = !expiresAt || (typeof expiresAt === 'string' && new Date(expiresAt) > now)
+
+      const customerEntitlement: CustomerEntitlement =
+        status === 'active' && notExpired ? (plan === 'pro' ? 'pro' : 'standard') : 'none'
+
+      const allowed = packageVisibleToCustomer({
+        packageEntitlement: (packageDoc as any)?.entitlement,
+        customerEntitlement,
+        hideNoneForPaying: false, // direct fetch should allow entitlement=none too
+      })
+
+      if (!allowed) {
+        return NextResponse.json({ error: 'Not found' }, { status: 404 })
+      }
     }
     
     return NextResponse.json(packageDoc)

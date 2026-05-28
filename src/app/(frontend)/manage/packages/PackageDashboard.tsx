@@ -104,7 +104,8 @@ export function ManageDashboardEmptyState({ propertyCount = 0 }: { propertyCount
 
 type DurationOption = { label: string; days: number }
 const DURATION_OPTIONS: DurationOption[] = [
-  { label: "4 hours", days: 4 / 24 },
+  // Backend validation requires min 0.5 nights. Model “per hour” as half-day (0.5).
+  { label: "4 hours", days: 0.5 },
   { label: "1 day", days: 1 },
   { label: "2 days", days: 2 },
   { label: "3 days", days: 3 },
