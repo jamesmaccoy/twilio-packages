@@ -123,13 +123,14 @@ const Packages: CollectionConfig = {
     {
       name: 'entitlement',
       type: 'select',
+      hasMany: true,
       options: [
         { label: 'None', value: 'none' },
         { label: 'Standard', value: 'standard' },
         { label: 'Pro', value: 'pro' },
       ],
       required: false,
-      defaultValue: 'standard',
+      defaultValue: ['standard'],
     },
     { 
       name: 'minNights', 
@@ -192,7 +193,7 @@ const Packages: CollectionConfig = {
       type: 'number',
       required: false,
       min: 0,
-      validate: (val) => {
+      validate: (val: unknown) => {
         if (val === null || val === undefined || val === '') return true
         const n = typeof val === 'number' ? val : Number(val)
         if (!Number.isFinite(n)) return 'Base rate must be a number'

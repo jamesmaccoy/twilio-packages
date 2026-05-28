@@ -10,6 +10,35 @@ export function normalizePackageEntitlement(raw: unknown): CustomerEntitlement {
   return 'standard'
 }
 
+/** Normalize a package entitlement that may be a string or array. Missing => ['standard']. */
+export function normalizePackageEntitlements(raw: unknown): CustomerEntitlement[] {
+  if (Array.isArray(raw)) {
+    const out = raw.map(normalizePackageEntitlement)
+    // dedupe while preserving order
+    return out.filter((v, i) => out.indexOf(v) === i)
+  }
+  return [normalizePackageEntitlement(raw)]
+}
+
+export function packageVisibleToCustomer(opts: {
+  packageEntitlement: unknown
+  customerEntitlement: CustomerEntitlement
+  /** Keeps the prior behavior: paying users don't see free-to-all packages. */
+  hideNoneForPaying?: boolean
+}): boolean {
+  const { packageEntitlement, customerEntitlement, hideNoneForPaying = true } = opts
+  const entitlements = new Set(normalizePackageEntitlements(packageEntitlement))
+
+  if (customerEntitlement === 'none') return entitlements.has('none')
+  if (customerEntitlement === 'standard') {
+    if (hideNoneForPaying) return entitlements.has('standard')
+    return entitlements.has('standard') || entitlements.has('none')
+  }
+  // pro
+  if (customerEntitlement === 'pro') return entitlements.has('pro') || entitlements.has('standard')
+  return false
+}
+
 /** True when a non-subscriber may book this package (explicit entitlement=none). */
 export function isPublicBookablePackage(pkg: {
   isEnabled?: boolean
@@ -18,7 +47,7 @@ export function isPublicBookablePackage(pkg: {
 }): boolean {
   if (!pkg?.isEnabled) return false
   if (hasPackageCategory(pkg.category, 'addon')) return false
-  return normalizePackageEntitlement(pkg.entitlement) === 'none'
+  return normalizePackageEntitlements(pkg.entitlement).includes('none')
 }
 
 // Enhanced package interface

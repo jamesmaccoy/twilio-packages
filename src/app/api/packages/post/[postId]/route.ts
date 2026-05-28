@@ -6,6 +6,8 @@ import {
   getCustomerEntitlement,
   isPublicBookablePackage,
   normalizePackageEntitlement,
+  normalizePackageEntitlements,
+  packageVisibleToCustomer,
   type CustomerEntitlement,
 } from '@/utils/packageSuggestions'
 import { hasPackageCategory } from '@/utils/packageCategories'
@@ -364,17 +366,18 @@ export async function GET(
       .filter((pkg: any) => Boolean(pkg?.isEnabled))
       .filter((pkg: any) => !hasPackageCategory(pkg?.category, 'addon'))
       .filter((pkg: any) => {
-        const pkgEntitlement = normalizePackageEntitlement(pkg?.entitlement)
+        const pkgEntitlements = normalizePackageEntitlements(pkg?.entitlement)
 
         // Home editorial grid: show bookable tiers for browsing (not pro-only upsells).
         if (isEditorialPreview) {
-          return pkgEntitlement === 'none' || pkgEntitlement === 'standard'
+          return pkgEntitlements.includes('none') || pkgEntitlements.includes('standard')
         }
 
-        if (customerEntitlement === 'none') return pkgEntitlement === 'none'
-        if (customerEntitlement === 'standard') return pkgEntitlement === 'standard'
-        if (customerEntitlement === 'pro') return pkgEntitlement === 'standard' || pkgEntitlement === 'pro'
-        return false
+        return packageVisibleToCustomer({
+          packageEntitlement: pkg?.entitlement,
+          customerEntitlement,
+          hideNoneForPaying: true,
+        })
       })
 
     // Debug logging

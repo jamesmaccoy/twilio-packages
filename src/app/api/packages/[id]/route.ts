@@ -311,6 +311,14 @@ export async function PATCH(
         cleanData[field] = normalizeValue(body[field])
       }
     }
+
+    // Normalize multi-select fields (supports legacy single values)
+    if (cleanData.category && !Array.isArray(cleanData.category)) {
+      cleanData.category = [cleanData.category]
+    }
+    if (cleanData.entitlement && !Array.isArray(cleanData.entitlement)) {
+      cleanData.entitlement = [cleanData.entitlement]
+    }
     
     console.log('Updating package with clean data:', JSON.stringify(cleanData, null, 2))
     

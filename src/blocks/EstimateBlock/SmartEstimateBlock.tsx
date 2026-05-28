@@ -36,6 +36,8 @@ import {
   getCustomerEntitlement,
   isPublicBookablePackage,
   normalizePackageEntitlement,
+  normalizePackageEntitlements,
+  packageVisibleToCustomer,
   type CustomerEntitlement,
 } from '@/utils/packageSuggestions'
 import { categoryPriorityScore, hasPackageCategory } from '@/utils/packageCategories'
@@ -485,16 +487,16 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
         return false
       }
 
-      const pkgEntitlement = normalizePackageEntitlement(pkg.entitlement)
-
-      // Entitlement-based gating (preferred).
-      // - entitlement=none: visible to everyone (including guests / unsubscribed)
-      // - entitlement=standard: requires standard or pro
-      // - entitlement=pro: requires pro
-      if (customerEntitlement === 'none') return pkgEntitlement === 'none'
-      // For paying users, reduce choice by hiding free (`none`) packages.
-      if (customerEntitlement === 'standard') return pkgEntitlement === 'standard'
-      if (customerEntitlement === 'pro') return pkgEntitlement === 'standard' || pkgEntitlement === 'pro'
+      // Entitlement-based gating (supports entitlement arrays).
+      if (
+        !packageVisibleToCustomer({
+          packageEntitlement: pkg.entitlement,
+          customerEntitlement,
+          hideNoneForPaying: true,
+        })
+      ) {
+        return false
+      }
       
       // Legacy: Filter out pro-only packages by yocoId for non-pro users
         // Only keep this for packages that don't have entitlement field in database
@@ -544,10 +546,15 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
         if (!pkg.isEnabled) return false
         if (hasPackageCategory(pkg.category, 'addon')) return false
 
-        const pkgEntitlement = normalizePackageEntitlement(pkg.entitlement)
-        if (customerEntitlement === 'none') return pkgEntitlement === 'none'
-        if (customerEntitlement === 'standard') return pkgEntitlement === 'standard'
-        if (customerEntitlement === 'pro') return pkgEntitlement === 'standard' || pkgEntitlement === 'pro'
+        if (
+          !packageVisibleToCustomer({
+            packageEntitlement: pkg.entitlement,
+            customerEntitlement,
+            hideNoneForPaying: true,
+          })
+        ) {
+          return false
+        }
 
         if (pkg.yocoId === 'gathering_monthly' && customerEntitlement !== 'pro') return false
         return true

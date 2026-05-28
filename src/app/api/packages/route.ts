@@ -355,6 +355,14 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       )
     }
+
+    // Normalize multi-select fields (supports legacy single values)
+    if (body?.category && !Array.isArray(body.category)) {
+      body.category = [body.category]
+    }
+    if (body?.entitlement && !Array.isArray(body.entitlement)) {
+      body.entitlement = [body.entitlement]
+    }
     
     const packageDoc = await payload.create({
       collection: 'packages',

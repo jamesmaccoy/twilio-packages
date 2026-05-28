@@ -5,7 +5,6 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Loader2, RefreshCw, AlertCircle, Sparkles, Check, Star, Crown, Package, TrendingUp, DollarSign, Calendar, CheckCircle, Users, Clock, MoreHorizontal, Bot, Home, Building2 } from "lucide-react";
@@ -14,6 +13,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { formatAmountToZAR, formatAmountToZARNoCents } from "@/lib/currency";
+
+type PackageCategory = 'standard' | 'hosted' | 'addon' | 'special';
+type PackageEntitlement = 'none' | 'standard' | 'pro';
 
 interface Package {
   id: string;
@@ -25,10 +27,10 @@ interface Package {
   maxNights: number;
   revenueCatId?: string;
   baseRate?: number;
-  category: 'standard' | 'hosted' | 'addon' | 'special';
+  category: PackageCategory[];
   multiplier: number;
   features: string[];
-  entitlement?: 'none' | 'standard' | 'pro';
+  entitlement?: PackageEntitlement[];
 }
 
 interface AvailableProduct {
@@ -39,10 +41,25 @@ interface AvailableProduct {
   currency: string;
   period: 'hour' | 'day' | 'week' | 'month' | 'year';
   periodCount: number;
-  category: 'standard' | 'hosted' | 'addon' | 'special';
+  category: PackageCategory[];
   features: string[];
-  entitlement?: 'none' | 'standard' | 'pro';
+  entitlement?: PackageEntitlement[];
   icon?: string;
+}
+
+function normalizeToArray<T extends string>(value: unknown, fallback: T): T[] {
+  if (Array.isArray(value)) {
+    return value.map((v) => String(v) as T).filter(Boolean)
+  }
+  if (typeof value === 'string' && value.trim()) return [value.trim() as T]
+  return [fallback]
+}
+
+function toggleInArray<T extends string>(current: T[] | undefined, value: T): T[] {
+  const set = new Set((Array.isArray(current) ? current : []).filter(Boolean))
+  if (set.has(value)) set.delete(value)
+  else set.add(value)
+  return Array.from(set)
 }
 
 interface PackageDashboardProps {
@@ -214,10 +231,10 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
             maxNights: pkg.maxNights,
             revenueCatId: normalisedRevenueCatId,
             baseRate: pkg.baseRate,
-            category: pkg.category,
+            category: normalizeToArray<PackageCategory>(pkg.category, 'standard'),
             multiplier: pkg.multiplier || 1,
             features: pkg.features || [],
-            entitlement: pkg.entitlement || 'standard',
+            entitlement: normalizeToArray<PackageEntitlement>(pkg.entitlement, 'standard'),
           };
         });
 
@@ -327,9 +344,9 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
           currency: 'ZAR',
           period: 'week',
           periodCount: 2,
-          category: 'standard',
+          category: ['standard'],
           features: ['Standard accommodation', 'Basic amenities', 'Free WiFi'],
-          entitlement: 'standard',
+          entitlement: ['standard'],
           icon: '🏖️',
         },
         {
@@ -340,9 +357,9 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
           currency: 'ZAR',
           period: 'hour',
           periodCount: 1,
-          category: 'hosted',
+          category: ['hosted'],
           features: ['Premium service', 'Enhanced amenities', 'Dedicated support', 'VIP treatment'],
-          entitlement: 'pro',
+          entitlement: ['pro'],
           icon: '✨',
         }
       ]
@@ -946,36 +963,53 @@ export default function PackageDashboard({ postId, startOnboarding }: PackageDas
                               <div className="grid grid-cols-2 gap-3">
                                 <div>
                                   <label className="text-sm font-medium text-slate-600 dark:text-muted-foreground">Category</label>
-                                  <Select
-                                    value={editingPackage.category || 'standard'}
-                                    onValueChange={value => setEditingPackage({ ...editingPackage, category: value as any })}
-                                  >
-                                    <SelectTrigger className="mt-1">
-                                      <SelectValue placeholder="Select category" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="standard">Standard</SelectItem>
-                                      <SelectItem value="hosted">Hosted</SelectItem>
-                                      <SelectItem value="addon">Add-on</SelectItem>
-                                      <SelectItem value="special">Special</SelectItem>
-                                    </SelectContent>
-                                  </Select>
+                                  <div className="mt-2 space-y-2">
+                                    {(['standard', 'hosted', 'special', 'addon'] as const).map((cat) => (
+                                      <button
+                                        key={cat}
+                                        type="button"
+                                        onClick={() =>
+                                          setEditingPackage({
+                                            ...editingPackage,
+                                            category: toggleInArray(editingPackage.category, cat),
+                                          })
+                                        }
+                                        className={[
+                                          'w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors',
+                                          (editingPackage.category || []).includes(cat)
+                                            ? 'border-teal-300 bg-teal-50 text-teal-950 dark:border-teal-900/60 dark:bg-teal-950/30 dark:text-teal-50'
+                                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-border dark:bg-card dark:text-foreground dark:hover:bg-muted',
+                                        ].join(' ')}
+                                      >
+                                        <span className="font-medium capitalize">{cat}</span>
+                                      </button>
+                                    ))}
+                                  </div>
                                 </div>
                                 <div>
                                   <label className="text-sm font-medium text-slate-600 dark:text-muted-foreground">Entitlement</label>
-                                  <Select
-                                    value={editingPackage.entitlement || 'standard'}
-                                    onValueChange={value => setEditingPackage({ ...editingPackage, entitlement: value as any })}
-                                  >
-                                    <SelectTrigger className="mt-1">
-                                      <SelectValue placeholder="Select entitlement" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="none">None</SelectItem>
-                                      <SelectItem value="standard">Standard</SelectItem>
-                                      <SelectItem value="pro">Pro</SelectItem>
-                                    </SelectContent>
-                                  </Select>
+                                  <div className="mt-2 space-y-2">
+                                    {(['none', 'standard', 'pro'] as const).map((tier) => (
+                                      <button
+                                        key={tier}
+                                        type="button"
+                                        onClick={() =>
+                                          setEditingPackage({
+                                            ...editingPackage,
+                                            entitlement: toggleInArray(editingPackage.entitlement, tier),
+                                          })
+                                        }
+                                        className={[
+                                          'w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors',
+                                          (editingPackage.entitlement || []).includes(tier)
+                                            ? 'border-teal-300 bg-teal-50 text-teal-950 dark:border-teal-900/60 dark:bg-teal-950/30 dark:text-teal-50'
+                                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-border dark:bg-card dark:text-foreground dark:hover:bg-muted',
+                                        ].join(' ')}
+                                      >
+                                        <span className="font-medium capitalize">{tier}</span>
+                                      </button>
+                                    ))}
+                                  </div>
                                 </div>
                               </div>
                               <div>
