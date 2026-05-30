@@ -313,6 +313,28 @@ Packages array should include the shack package with `"entitlement": ["none"]`.
 - SmartEstimateBlock visible; packages where `entitlement` includes `standard` or `pro`.
 - Add-on suggestions: any add-on tier the user qualifies for.
 
+##### Booking + add-on example (The Shack)
+
+| Field | Value |
+|-------|--------|
+| Booking | `69f09bb520dbcacd9e74bfaa` (`GET /api/bookings/69f09bb520dbcacd9e74bfaa?depth=2`) |
+| Post | **The Shack** — `69e9d58f7647fb5dd596540b` |
+| Customer | `thankyou.digital@gmail.com` — active **basic** (treated as **standard**) |
+| Add-on package | `69ef03d13a8ff5e990976fc5` — **Llandudno Guided Nature Walk** |
+| Category | `['addon']` only (not `['standard','addon']`) |
+| Entitlement | Should include `standard` or `none` for this customer |
+
+**Expected (logged in as thankyou):**
+
+```bash
+curl -s -b cookies.txt "http://localhost:3000/api/packages/addons/69e9d58f7647fb5dd596540b" | jq '.addons[] | {id, name, entitlement, category}'
+```
+
+- Response must include package `69ef03d13a8ff5e990976fc5`.
+- Must **not** include pro-only add-ons.
+- Must **not** include mis-tagged items like mortgage (`category: ['standard','addon']`) — addon API uses **addon-only** category.
+- **SmartEstimateBlock** / booking page: all eligible add-ons listed (no Gemini `/api/packages/suggest` required).
+
 ### Manual Testing Checklist
 
 - [ ] Server is running (`http://localhost:3000`)

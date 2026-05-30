@@ -607,8 +607,8 @@ export default function BookingDetailsClientPage({ data, user, isPreview }: Prop
         }
 
         const [addonsResponse, allPackagesResponse] = await Promise.all([
-          fetch(`/api/packages/addons/${postId}`),
-          fetch(`/api/packages/post/${postId}`),
+          fetch(`/api/packages/addons/${postId}`, { credentials: 'include', cache: 'no-store' }),
+          fetch(`/api/packages/post/${postId}`, { credentials: 'include', cache: 'no-store' }),
         ])
 
         if (!addonsResponse.ok || !allPackagesResponse.ok) {

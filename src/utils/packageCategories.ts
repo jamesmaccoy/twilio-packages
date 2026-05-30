@@ -18,6 +18,12 @@ export function hasPackageCategory(value: PackageCategoryValue, category: Packag
   return normalizePackageCategories(value).includes(category)
 }
 
+/** True when category is addon-only (not also standard/hosted/special). */
+export function isAddonOnlyPackage(value: PackageCategoryValue): boolean {
+  const cats = normalizePackageCategories(value)
+  return cats.includes('addon') && cats.length === 1
+}
+
 export function getPrimaryPackageCategory(value: PackageCategoryValue): PackageCategory {
   const list = normalizePackageCategories(value)
   return list[0] || 'standard'

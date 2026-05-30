@@ -1157,7 +1157,7 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
     }
   }, [isInitialized])
 
-  // Load and suggest addons when package and dates are selected
+  // Load add-ons when package and dates are selected (entitlement-filtered server-side; no AI required).
   const loadAndSuggestAddons = useCallback(async () => {
     if (!selectedPackage || !startDate || !endDate || !isLoggedIn) {
       setSuggestedAddons([])
@@ -1166,104 +1166,37 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
 
     setIsLoadingAddons(true)
     try {
-      // First, fetch available addons for this post
-      const addonsResponse = await fetch(`/api/packages/addons/${postId}`)
+      const addonsResponse = await fetch(`/api/packages/addons/${postId}`, {
+        credentials: 'include',
+        cache: 'no-store',
+      })
       if (!addonsResponse.ok) {
         throw new Error('Failed to fetch addons')
       }
       const addonsData = await addonsResponse.json()
-      const availableAddons = addonsData.addons || []
+      const availableAddons: any[] = Array.isArray(addonsData?.addons) ? addonsData.addons : []
 
-      if (availableAddons.length === 0) {
-        setSuggestedAddons([])
-        setIsLoadingAddons(false)
-        return
-      }
+      const sorted = [...availableAddons].sort(
+        (a, b) => (Number(a.baseRate) || 0) - (Number(b.baseRate) || 0),
+      )
 
-      // Use AI to suggest relevant addons based on package and dates
-      const contextDescription = `Package: ${selectedPackage.name} (${duration} ${duration === 1 ? 'night' : 'nights'}), Dates: ${format(startDate, 'MMM dd')} - ${format(endDate, 'MMM dd, yyyy')}, Property: ${postTitle}`
-      
-      const suggestResponse = await fetch('/api/packages/suggest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          description: contextDescription,
-          postId,
-          baseRate,
-          hostContext: false
-        })
-      })
-
-      if (suggestResponse.ok) {
-        const suggestData = await suggestResponse.json()
-        const aiRecommendations = suggestData.recommendations || []
-        
-        // Filter to only addon category recommendations
-        const addonRecommendations = aiRecommendations.filter((r: any) => 
-          r.details?.category === 'addon'
-        )
-
-        // Match AI suggestions with available addons
-        const matchedAddons: AddonPackage[] = []
-        
-        // First, add AI-suggested addons that match available addons
-        for (const recommendation of addonRecommendations) {
-          const matchedAddon = availableAddons.find((addon: any) => 
-            addon.id === recommendation.revenueCatId || 
-            addon.revenueCatId === recommendation.revenueCatId ||
-            addon.name.toLowerCase().includes(recommendation.suggestedName.toLowerCase()) ||
-            recommendation.suggestedName.toLowerCase().includes(addon.name.toLowerCase())
-          )
-          
-          if (matchedAddon) {
-            matchedAddons.push({
-              id: matchedAddon.id,
-              name: matchedAddon.name,
-              description: matchedAddon.description || recommendation.description || '',
-              baseRate: matchedAddon.baseRate || recommendation.baseRate || 0,
-              enabled: false,
-              features: matchedAddon.features || recommendation.features || []
-            })
-          }
-        }
-
-        // If no AI matches, show top 1 available addon (sorted by price)
-        if (matchedAddons.length === 0 && availableAddons.length > 0) {
-          const topAddons = availableAddons
-            .slice(0, 1)
-            .map((addon: any) => ({
-              id: addon.id,
-              name: addon.name,
-              description: addon.description || '',
-              baseRate: addon.baseRate || 0,
-              enabled: false,
-              features: addon.features || []
-            }))
-          matchedAddons.push(...topAddons)
-        }
-
-        setSuggestedAddons(matchedAddons.slice(0, 1)) // Limit to 1 suggestion
-      } else {
-        // Fallback: show top 1 available addon if AI fails
-        const topAddons = availableAddons
-          .slice(0, 1)
-          .map((addon: any) => ({
-            id: addon.id,
-            name: addon.name,
-            description: addon.description || '',
-            baseRate: addon.baseRate || 0,
-            enabled: false,
-            features: addon.features || []
-          }))
-        setSuggestedAddons(topAddons)
-      }
+      setSuggestedAddons(
+        sorted.map((addon) => ({
+          id: addon.id,
+          name: addon.name,
+          description: addon.description || '',
+          baseRate: addon.baseRate || 0,
+          enabled: false,
+          features: addon.features || [],
+        })),
+      )
     } catch (error) {
       console.error('Error loading addons:', error)
       setSuggestedAddons([])
     } finally {
       setIsLoadingAddons(false)
     }
-  }, [selectedPackage, startDate, endDate, duration, postId, postTitle, baseRate, isLoggedIn])
+  }, [selectedPackage, startDate, endDate, postId, isLoggedIn])
 
   // Load addons when package and dates change
   useEffect(() => {

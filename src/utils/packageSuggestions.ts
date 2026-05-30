@@ -35,8 +35,32 @@ export function packageVisibleToCustomer(opts: {
     return entitlements.has('standard') || entitlements.has('none')
   }
   // pro
-  if (customerEntitlement === 'pro') return entitlements.has('pro') || entitlements.has('standard')
+  if (customerEntitlement === 'pro') {
+    if (hideNoneForPaying) return entitlements.has('pro') || entitlements.has('standard')
+    return entitlements.has('pro') || entitlements.has('standard') || entitlements.has('none')
+  }
   return false
+}
+
+/** Map a Payload user to customer entitlement (basic plan => standard). */
+export function getCustomerEntitlementFromUser(user: unknown): CustomerEntitlement {
+  if (!user || typeof user !== 'object') return 'none'
+
+  const role = (user as { role?: unknown }).role
+  const roleArray = Array.isArray(role) ? role : role ? [role] : []
+  if (roleArray.includes('admin')) return 'pro'
+
+  const sub = (user as { subscriptionStatus?: { status?: string; plan?: string; expiresAt?: string } })
+    .subscriptionStatus
+  const status = sub?.status
+  const expiresAt = sub?.expiresAt
+  const plan = String(sub?.plan || '').toLowerCase()
+  const now = new Date()
+  const notExpired =
+    !expiresAt || (typeof expiresAt === 'string' && expiresAt.length > 0 && new Date(expiresAt) > now)
+
+  if (status === 'active' && notExpired) return plan === 'pro' ? 'pro' : 'standard'
+  return 'none'
 }
 
 /** True when a non-subscriber may book this package (explicit entitlement=none). */
