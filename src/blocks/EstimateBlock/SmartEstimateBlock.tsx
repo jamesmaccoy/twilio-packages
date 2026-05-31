@@ -3613,49 +3613,47 @@ ${parsedDates.startDate && parsedDates.endDate ? `\nIMPORTANT: User just request
           </motion.div>
         )}
 
-        {/* Suggested add-ons carousel */}
+        {/* Suggested add-ons — compact strip */}
         {selectedPackage && startDate && endDate && (
-          <div className="mb-4">
+          <div className="mb-2 shrink-0">
             {isLoadingAddons ? (
-              <div className="flex items-center justify-center p-3 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg">
-                <Loader2 className="h-4 w-4 animate-spin text-teal-500 dark:text-teal-400 mr-2" />
-                <span className="text-xs text-slate-500 dark:text-slate-400">Loading add-ons...</span>
+              <div className="flex h-8 items-center justify-center gap-1.5 rounded-md border border-zinc-200 bg-white px-2 dark:border-zinc-700 dark:bg-zinc-800">
+                <Loader2 className="h-3 w-3 animate-spin text-teal-500" />
+                <span className="text-[10px] text-slate-500 dark:text-slate-400">Add-ons…</span>
               </div>
             ) : suggestedAddons.length > 0 ? (
-              <div className="space-y-2">
-                <div className="flex items-center gap-1.5">
-                  <Sparkles className="h-3.5 w-3.5 text-teal-500 dark:text-teal-400" />
-                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Suggested add-ons
-                  </span>
-                </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                  Add-ons
+                </p>
                 <Carousel
                   opts={{ align: 'start', loop: suggestedAddons.length > 1 }}
-                  className="w-full relative px-8"
+                  className="relative w-full px-6"
                 >
-                  <CarouselContent className="-ml-2">
+                  <CarouselContent className="-ml-1.5">
                     {suggestedAddons.map((addon) => {
                       const isSelected = selectedAddons.has(addon.id)
                       return (
-                        <CarouselItem key={addon.id} className="pl-2 basis-[78%] sm:basis-[200px]">
+                        <CarouselItem
+                          key={addon.id}
+                          className="pl-1.5 basis-[9.5rem] sm:basis-[10.5rem]"
+                        >
                           <div
                             className={cn(
-                              'flex h-full flex-col rounded-lg border p-3 transition-colors',
+                              'flex h-8 items-center gap-1.5 rounded-md border px-2 transition-colors',
                               isSelected
-                                ? 'border-teal-400 bg-teal-50/50 dark:border-teal-600 dark:bg-teal-900/20'
+                                ? 'border-teal-400/80 bg-teal-50/60 dark:border-teal-600 dark:bg-teal-900/25'
                                 : 'border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-800',
                             )}
                           >
-                            <div className="mb-2 min-w-0 flex-1">
-                              <p className="text-sm font-medium leading-tight text-slate-900 dark:text-slate-100 line-clamp-2">
+                            <div className="min-w-0 flex-1 leading-none">
+                              <p
+                                className="truncate text-[11px] font-medium text-slate-800 dark:text-slate-100"
+                                title={addon.name}
+                              >
                                 {addon.name}
                               </p>
-                              {addon.description ? (
-                                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
-                                  {addon.description}
-                                </p>
-                              ) : null}
-                              <p className="mt-1.5 text-xs font-medium text-teal-600 dark:text-teal-400">
+                              <p className="text-[10px] text-teal-600 dark:text-teal-400">
                                 +R{addon.baseRate.toFixed(0)}
                               </p>
                             </div>
@@ -3680,14 +3678,14 @@ ${parsedDates.startDate && parsedDates.endDate ? `\nIMPORTANT: User just request
                                 })
                               }}
                               className={cn(
-                                'relative mt-auto inline-flex h-6 w-11 shrink-0 items-center self-end rounded-full transition-colors',
+                                'relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors',
                                 isSelected ? 'bg-teal-500' : 'bg-zinc-200 dark:bg-zinc-600',
                               )}
                             >
                               <span
                                 className={cn(
-                                  'inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform',
-                                  isSelected ? 'translate-x-6' : 'translate-x-1',
+                                  'inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform',
+                                  isSelected ? 'translate-x-3.5' : 'translate-x-0.5',
                                 )}
                               />
                             </button>
@@ -3698,8 +3696,8 @@ ${parsedDates.startDate && parsedDates.endDate ? `\nIMPORTANT: User just request
                   </CarouselContent>
                   {suggestedAddons.length > 1 ? (
                     <>
-                      <CarouselPrevious className="left-0 top-1/2 h-7 w-7 -translate-y-1/2 border-zinc-200 dark:border-zinc-600" />
-                      <CarouselNext className="right-0 top-1/2 h-7 w-7 -translate-y-1/2 border-zinc-200 dark:border-zinc-600" />
+                      <CarouselPrevious className="left-0 top-1/2 h-5 w-5 -translate-y-1/2 border-zinc-200 p-0 dark:border-zinc-600 [&_svg]:h-3 [&_svg]:w-3" />
+                      <CarouselNext className="right-0 top-1/2 h-5 w-5 -translate-y-1/2 border-zinc-200 p-0 dark:border-zinc-600 [&_svg]:h-3 [&_svg]:w-3" />
                     </>
                   ) : null}
                 </Carousel>
