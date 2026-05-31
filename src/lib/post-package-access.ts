@@ -3,7 +3,7 @@ import {
   normalizePackageEntitlements,
   type CustomerEntitlement,
 } from '@/utils/packageSuggestions'
-import { categoryPriorityScore, hasPackageCategory } from '@/utils/packageCategories'
+import { categoryPriorityScore, hasPackageCategory, isMainBookablePackage } from '@/utils/packageCategories'
 
 export type PostPackageAccessIndex = {
   /** Guest may book without a subscription (entitlement=none, enabled, non-addon). */
@@ -74,7 +74,7 @@ export async function getPostPackageAccessIndex(
   let bestCategoryScore = -1
 
   for (const pkg of dbPackages.docs) {
-    if (hasPackageCategory(pkg.category, 'addon')) continue
+    if (!isMainBookablePackage(pkg.category)) continue
 
     const entitlement = (pkg as { entitlement?: unknown }).entitlement
     if (!isPackageEnabledForPost(pkg.id, entitlement, packageSettings)) continue

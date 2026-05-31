@@ -9,7 +9,7 @@ import {
   packageVisibleToCustomer,
   type CustomerEntitlement,
 } from '@/utils/packageSuggestions'
-import { hasPackageCategory } from '@/utils/packageCategories'
+import { hasPackageCategory, isMainBookablePackage } from '@/utils/packageCategories'
 import { getPostPackageAccessIndex } from '@/lib/post-package-access'
 import jwt from 'jsonwebtoken'
 
@@ -364,7 +364,7 @@ export async function GET(
     // - pro: entitlement=standard or pro
     const allPackages = combinedPackages
       .filter((pkg: any) => Boolean(pkg?.isEnabled))
-      .filter((pkg: any) => !hasPackageCategory(pkg?.category, 'addon'))
+      .filter((pkg: any) => isMainBookablePackage(pkg?.category))
       .filter((pkg: any) => {
         const pkgEntitlements = normalizePackageEntitlements(pkg?.entitlement)
 

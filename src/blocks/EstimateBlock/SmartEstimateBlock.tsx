@@ -40,13 +40,20 @@ import {
   packageVisibleToCustomer,
   type CustomerEntitlement,
 } from '@/utils/packageSuggestions'
-import { categoryPriorityScore, hasPackageCategory } from '@/utils/packageCategories'
+import { categoryPriorityScore, isMainBookablePackage } from '@/utils/packageCategories'
 import { calculateTotal } from '@/lib/calculateTotal'
 import { useYoco } from '@/providers/Yoco'
 import { yocoService, YocoProduct, YocoPaymentLink } from '@/lib/yocoService'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Mic, MicOff } from 'lucide-react'
 import { PackageDisplay } from '@/components/PackageDisplay'
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from '@/components/ui/carousel'
 
 interface Package {
   id: string
@@ -483,7 +490,7 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
       }
       
       // Filter out addon packages - these should only appear on the booking page
-      if (hasPackageCategory(pkg.category, 'addon')) {
+      if (!isMainBookablePackage(pkg.category)) {
         return false
       }
 
@@ -544,7 +551,7 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
 
       const filtered = rawPackages.filter((pkg: Package) => {
         if (!pkg.isEnabled) return false
-        if (hasPackageCategory(pkg.category, 'addon')) return false
+        if (!isMainBookablePackage(pkg.category)) return false
 
         if (
           !packageVisibleToCustomer({
@@ -3606,79 +3613,97 @@ ${parsedDates.startDate && parsedDates.endDate ? `\nIMPORTANT: User just request
           </motion.div>
         )}
 
-        {/* AI-Suggested Addons */}
+        {/* Suggested add-ons carousel */}
         {selectedPackage && startDate && endDate && (
-          <div className="mb-4 space-y-2">
+          <div className="mb-4">
             {isLoadingAddons ? (
               <div className="flex items-center justify-center p-3 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg">
                 <Loader2 className="h-4 w-4 animate-spin text-teal-500 dark:text-teal-400 mr-2" />
-                <span className="text-xs text-slate-500 dark:text-slate-400">Finding relevant addons...</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">Loading add-ons...</span>
               </div>
             ) : suggestedAddons.length > 0 ? (
-              <>
-                <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
-                  Suggested Add-ons
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-teal-500 dark:text-teal-400" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Suggested add-ons
+                  </span>
                 </div>
-                {suggestedAddons.map((addon) => {
-                  const isSelected = selectedAddons.has(addon.id)
-                  return (
-                    <motion.div
-                      key={addon.id}
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.1 }}
-                      className="flex items-center justify-between p-3 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors"
-                    >
-                      <div className="flex items-center gap-3 flex-1">
-                        <div className="p-2 bg-teal-50 dark:bg-teal-900/20 rounded-md">
-                          <Package className="h-4 w-4 text-teal-600 dark:text-teal-400" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                            {addon.name}
-                          </div>
-                          {addon.description && (
-                            <div className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1">
-                              {addon.description}
+                <Carousel
+                  opts={{ align: 'start', loop: suggestedAddons.length > 1 }}
+                  className="w-full relative px-8"
+                >
+                  <CarouselContent className="-ml-2">
+                    {suggestedAddons.map((addon) => {
+                      const isSelected = selectedAddons.has(addon.id)
+                      return (
+                        <CarouselItem key={addon.id} className="pl-2 basis-[78%] sm:basis-[200px]">
+                          <div
+                            className={cn(
+                              'flex h-full flex-col rounded-lg border p-3 transition-colors',
+                              isSelected
+                                ? 'border-teal-400 bg-teal-50/50 dark:border-teal-600 dark:bg-teal-900/20'
+                                : 'border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-800',
+                            )}
+                          >
+                            <div className="mb-2 min-w-0 flex-1">
+                              <p className="text-sm font-medium leading-tight text-slate-900 dark:text-slate-100 line-clamp-2">
+                                {addon.name}
+                              </p>
+                              {addon.description ? (
+                                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
+                                  {addon.description}
+                                </p>
+                              ) : null}
+                              <p className="mt-1.5 text-xs font-medium text-teal-600 dark:text-teal-400">
+                                +R{addon.baseRate.toFixed(0)}
+                              </p>
                             </div>
-                          )}
-                          <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                            +R{addon.baseRate.toFixed(0)}
+                            <button
+                              type="button"
+                              aria-pressed={isSelected}
+                              aria-label={isSelected ? `Remove ${addon.name}` : `Add ${addon.name}`}
+                              onClick={() => {
+                                const newSelected = new Set(selectedAddons)
+                                if (isSelected) {
+                                  newSelected.delete(addon.id)
+                                } else {
+                                  newSelected.add(addon.id)
+                                }
+                                setSelectedAddons(newSelected)
+                                appendMessageToThread(activeThreadRef.current, {
+                                  role: 'assistant',
+                                  content: isSelected
+                                    ? `Removed "${addon.name}" addon from your booking.`
+                                    : `Added "${addon.name}" addon (+R${addon.baseRate.toFixed(0)}) to your booking.`,
+                                  type: 'text',
+                                })
+                              }}
+                              className={cn(
+                                'relative mt-auto inline-flex h-6 w-11 shrink-0 items-center self-end rounded-full transition-colors',
+                                isSelected ? 'bg-teal-500' : 'bg-zinc-200 dark:bg-zinc-600',
+                              )}
+                            >
+                              <span
+                                className={cn(
+                                  'inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform',
+                                  isSelected ? 'translate-x-6' : 'translate-x-1',
+                                )}
+                              />
+                            </button>
                           </div>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => {
-                          const newSelected = new Set(selectedAddons)
-                          if (isSelected) {
-                            newSelected.delete(addon.id)
-                          } else {
-                            newSelected.add(addon.id)
-                          }
-                          setSelectedAddons(newSelected)
-                          
-                          // Notify assistant
-                          const message: Message = {
-                            role: 'assistant',
-                            content: isSelected
-                              ? `Removed "${addon.name}" addon from your booking.`
-                              : `Added "${addon.name}" addon (+R${addon.baseRate.toFixed(0)}) to your booking.`,
-                            type: 'text'
-                          }
-                          appendMessageToThread(activeThreadRef.current, message)
-                        }}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ml-3 ${isSelected ? 'bg-teal-500' : 'bg-zinc-200 dark:bg-zinc-600'}`}
-                      >
-                        <motion.span
-                          layout
-                          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition ${isSelected ? 'translate-x-6' : 'translate-x-1'}`}
-                        />
-                      </button>
-                    </motion.div>
-                  )
-                })}
-              </>
+                        </CarouselItem>
+                      )
+                    })}
+                  </CarouselContent>
+                  {suggestedAddons.length > 1 ? (
+                    <>
+                      <CarouselPrevious className="left-0 top-1/2 h-7 w-7 -translate-y-1/2 border-zinc-200 dark:border-zinc-600" />
+                      <CarouselNext className="right-0 top-1/2 h-7 w-7 -translate-y-1/2 border-zinc-200 dark:border-zinc-600" />
+                    </>
+                  ) : null}
+                </Carousel>
+              </div>
             ) : null}
           </div>
         )}

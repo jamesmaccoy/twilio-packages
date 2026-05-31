@@ -24,6 +24,11 @@ export function isAddonOnlyPackage(value: PackageCategoryValue): boolean {
   return cats.includes('addon') && cats.length === 1
 }
 
+/** Main booking assistant / post packages list (excludes addon-only; keeps standard+addon hybrids on main). */
+export function isMainBookablePackage(value: PackageCategoryValue): boolean {
+  return !isAddonOnlyPackage(value)
+}
+
 export function getPrimaryPackageCategory(value: PackageCategoryValue): PackageCategory {
   const list = normalizePackageCategories(value)
   return list[0] || 'standard'

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import configPromise from '@/payload.config'
+import { getAuthedUser } from '@/lib/getAuthedUser'
 import { yocoService } from '@/lib/yocoService'
-import { hasPackageCategory, isAddonOnlyPackage } from '@/utils/packageCategories'
+import { isAddonOnlyPackage } from '@/utils/packageCategories'
 import {
   getCustomerEntitlementFromUser,
   packageVisibleToCustomer,
@@ -16,14 +17,7 @@ export async function GET(
     const payload = await getPayload({ config: configPromise })
     const { postId } = await params
     
-    // If authenticated, apply host ownership checks for draft/unpublished posts too.
-    let user: any = null
-    try {
-      const authResult = await payload.auth({ headers: request.headers })
-      user = authResult.user
-    } catch {
-      user = null
-    }
+    const user = await getAuthedUser(payload, request)
     
     // Get the post data to access packageSettings for custom names
     let postData = null
@@ -192,6 +186,15 @@ export async function GET(
       )
 
     const addonPackages = [...dbAddonPackages, ...yocoAddonPackages]
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('📦 Addons for post:', {
+        postId,
+        customerEntitlement,
+        total: addonPackages.length,
+        ids: addonPackages.map((p) => p.id),
+      })
+    }
 
     const response = NextResponse.json({
       addons: addonPackages,
