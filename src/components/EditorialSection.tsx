@@ -8,6 +8,9 @@ import type { Media as MediaType } from '@/payload-types'
 
 interface EditorialSectionProps {
   image?: MediaType | string | null
+  /** Post context — required for member-only blur + overlay on non-subscribers */
+  postId?: string
+  postTitle?: string
   title: string
   subtitle?: string
   description: string
@@ -18,6 +21,8 @@ interface EditorialSectionProps {
 
 export function EditorialSection({
   image,
+  postId,
+  postTitle,
   title,
   subtitle,
   description,
@@ -53,10 +58,14 @@ export function EditorialSection({
             >
               <div className="relative aspect-[4/5] overflow-hidden">
                 {typeof image === 'object' && image !== null ? (
-                  <Media 
-                    resource={image} 
-                    pictureClassName="w-full h-full"
-                    imgClassName="w-full h-full object-cover" 
+                  <Media
+                    fill
+                    className="absolute inset-0 h-full w-full"
+                    resource={image}
+                    postId={postId}
+                    postTitle={postTitle || title}
+                    imgClassName="object-cover"
+                    size="(max-width: 768px) 100vw, 50vw"
                   />
                 ) : (
                   <img

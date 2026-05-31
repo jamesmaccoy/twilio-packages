@@ -165,6 +165,11 @@ export function HomepageEditorial({ featuredPosts = [] }: HomepageEditorialProps
 
   const nights = useMemo(() => diffNights(fromDate, toDate), [fromDate, toDate])
 
+  const cityEditorialPost = useMemo(() => {
+    const parkEstate = posts.find((p) => (p as any)?.slug === 'park-estate')
+    return parkEstate || posts[2]
+  }, [posts])
+
   const filteredPosts = useMemo(() => {
     if (activeCategoryId === 'all') return posts
     return posts.filter((post) => {
@@ -370,6 +375,8 @@ export function HomepageEditorial({ featuredPosts = [] }: HomepageEditorialProps
                 <LuxuryCard
                   key={slug || postId || index}
                   image={metaImage}
+                  postId={postId || undefined}
+                  postTitle={title}
                   title={title}
                   subtitle={subtitle}
                   description={description}
@@ -406,21 +413,20 @@ export function HomepageEditorial({ featuredPosts = [] }: HomepageEditorialProps
       {/* Editorial Sections */}
       <EditorialSection
         image={posts[1]?.meta?.image || (posts[1] as any)?.heroImage}
+        postId={posts[1]?.id}
+        postTitle={posts[1]?.title}
         title="Southern Peninsula Escapes"
         subtitle="Cape Point • Hout Bay • Kommetjie"
         description="Discover the raw beauty of the Southern Peninsula. From the dramatic cliffs of Cape Point to the serene beaches of Kommetjie, experience a coastal lifestyle unlike any other."
         ctaText="Explore the Peninsula"
-        ctaLink="https://www.simpleplek.co.za/southern-peninsula"
+        ctaLink="https://www.simpleplek.co.za/lladndudno"
         align="left"
       />
 
       <EditorialSection
-        image={
-          posts.find((p) => (p as any)?.slug === 'park-estate')?.meta?.image ||
-          (posts.find((p) => (p as any)?.slug === 'park-estate') as any)?.heroImage ||
-          posts[2]?.meta?.image ||
-          (posts[2] as any)?.heroImage
-        }
+        image={cityEditorialPost?.meta?.image || (cityEditorialPost as any)?.heroImage}
+        postId={cityEditorialPost?.id}
+        postTitle={cityEditorialPost?.title}
         title="City Centre & Suburbs"
         subtitle="Gardens • Vredehoek • Rondebosch"
         description="Immerse yourself in the vibrant culture of Cape Town. Stay in the heart of the city, surrounded by world-class dining, art, and history, all within reach of the mountain."

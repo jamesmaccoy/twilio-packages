@@ -13,6 +13,7 @@ import { getMediaUrl } from '@/utilities/getMediaUrl'
 import { useSubscription } from '@/hooks/useSubscription'
 import { trackImageView } from '@/lib/imageTracking'
 import { useUserContext } from '@/context/UserContext'
+import { MembersOnlyImageOverlay } from '../MembersOnlyImageOverlay'
 
 const { breakpoints } = cssVariables
 
@@ -71,7 +72,11 @@ export const ImageMedia: React.FC<ImageMediaProps> = (props) => {
 
   // Determine if image should be throttled (blurred) for non-subscribers
   // Only throttle post cover/meta images, not all images
-  const shouldThrottle = !disableThrottling && !isSubscriptionLoading && !isSubscribed && (postId || postTitle)
+  const shouldThrottle =
+    !disableThrottling &&
+    !isSubscriptionLoading &&
+    !isSubscribed &&
+    Boolean(postId || postTitle)
 
   // Track image view when loaded (especially for restricted content)
   useEffect(() => {
@@ -126,14 +131,7 @@ export const ImageMedia: React.FC<ImageMediaProps> = (props) => {
         width={!fill ? width : undefined}
         onLoad={() => setImageLoaded(true)}
       />
-      {shouldThrottle && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center overflow-hidden bg-black/20 p-2 pointer-events-none">
-          <div className="max-w-full text-center rounded border border-white/10 bg-black/50 px-3 py-2 backdrop-blur-sm">
-            <p className="text-xs font-semibold leading-snug text-white/90 sm:text-sm">For members only</p>
-            <p className="mt-0.5 text-[10px] leading-snug text-white/80 sm:text-xs">Subscribe to view full image</p>
-          </div>
-        </div>
-      )}
+      {shouldThrottle && <MembersOnlyImageOverlay />}
     </div>
   )
 }

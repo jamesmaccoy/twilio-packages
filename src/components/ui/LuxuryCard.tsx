@@ -6,9 +6,12 @@ import { ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import type { Media } from '@/payload-types'
 import { getMediaUrl } from '@/utilities/getMediaUrl'
+import { Media as MediaComponent } from '@/components/Media'
 
 interface LuxuryCardProps {
   image?: Media | string | null
+  postId?: string
+  postTitle?: string
   title: string
   subtitle?: string
   description?: string
@@ -22,6 +25,8 @@ interface LuxuryCardProps {
 
 export function LuxuryCard({
   image,
+  postId,
+  postTitle,
   title,
   subtitle,
   description,
@@ -32,12 +37,14 @@ export function LuxuryCard({
   delay = 0,
   layoutId,
 }: LuxuryCardProps) {
-  // Extract image URL from Media object or use string directly
+  const mediaResource = image && typeof image === 'object' && 'url' in image ? image : null
+
+  // Legacy: plain URL string (not a Payload media doc)
   let imageUrl = ''
   if (typeof image === 'string') {
-    imageUrl = image
-  } else if (image && typeof image === 'object' && 'url' in image) {
-    imageUrl = getMediaUrl(image.url, image.updatedAt)
+    imageUrl = image.startsWith('http') || image.startsWith('/') ? image : ''
+  } else if (mediaResource) {
+    imageUrl = getMediaUrl(mediaResource.url, mediaResource.updatedAt)
   }
 
   return (
@@ -65,7 +72,17 @@ export function LuxuryCard({
           layoutId={layoutId ? `post-image-${layoutId}` : undefined}
         >
           <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors duration-500 z-10" />
-          {imageUrl ? (
+          {mediaResource ? (
+            <MediaComponent
+              fill
+              className="absolute inset-0 h-full w-full"
+              resource={mediaResource}
+              postId={postId}
+              postTitle={postTitle || title}
+              imgClassName="object-cover transition-transform duration-1000 ease-out group-hover:scale-105"
+              size="33vw"
+            />
+          ) : imageUrl ? (
             <motion.img
               src={imageUrl}
               alt={title}
