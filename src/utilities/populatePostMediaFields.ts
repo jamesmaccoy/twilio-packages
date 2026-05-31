@@ -1,5 +1,6 @@
 import type { Media, Post } from '@/payload-types'
 import type { Payload } from 'payload'
+import { getPostPackageAccessIndex } from '@/lib/post-package-access'
 
 type PostMediaFields = {
   heroImage?: Post['heroImage']
@@ -63,7 +64,12 @@ export async function populateRelatedPostsMedia(
   const populated = await Promise.all(
     relatedPosts.map(async (relatedPost) => {
       if (!relatedPost || typeof relatedPost !== 'object') return relatedPost
-      return populatePostMediaFields(payload, relatedPost)
+      const withMedia = await populatePostMediaFields(payload, relatedPost)
+      const postId = (withMedia as { id?: string }).id
+      if (!postId) return withMedia
+
+      const access = await getPostPackageAccessIndex(payload, postId, withMedia as Post)
+      return { ...withMedia, guestBookable: access.guestBookable }
     }),
   )
 

@@ -11,15 +11,21 @@ import type { Post } from '@/payload-types'
 import { formatAuthors } from '@/utilities/formatAuthors'
 import { Media } from '@/components/Media'
 import { useSubscription } from '@/hooks/useSubscription'
+import { usePostGuestBookable } from '@/hooks/usePostGuestBookable'
 import { trackImageView } from '@/lib/imageTracking'
 import { useUserContext } from '@/context/UserContext'
 import { useEffect, useRef } from 'react'
 
 export const PostHero: React.FC<{
   post: Post
-}> = ({ post }) => {
+  guestBookable?: boolean
+}> = ({ post, guestBookable: guestBookableFromServer }) => {
   const { categories, heroImage, meta, populatedAuthors, publishedAt, title, slug } = post
   const { isSubscribed, isLoading: isSubscriptionLoading } = useSubscription()
+  const { guestBookable, isLoading: isGuestAccessLoading } = usePostGuestBookable(
+    post.id,
+    guestBookableFromServer,
+  )
   const { currentUser } = useUserContext()
   const trackedRef = useRef(false)
 
@@ -29,13 +35,15 @@ export const PostHero: React.FC<{
   // Prioritize heroImage (original behavior), fall back to meta.image for layout animation matching
   const displayImage = heroImage || meta?.image
   
-  // Only show image if user has active subscription
-  // Don't show image while subscription status is loading to avoid flash
-  const shouldShowImage = !isSubscriptionLoading && isSubscribed && displayImage
+  const canViewImage = isSubscribed || guestBookable
 
-  // Track when non-subscribers would view the image (restricted content)
+  // Show image for subscribers or posts with public (entitlement none) packages
+  const shouldShowImage =
+    !isSubscriptionLoading && !isGuestAccessLoading && canViewImage && displayImage
+
+  // Track when non-subscribers without guest access would view the image
   useEffect(() => {
-    if (!isSubscriptionLoading && !isSubscribed && displayImage && !trackedRef.current) {
+    if (!isSubscriptionLoading && !isGuestAccessLoading && !canViewImage && displayImage && !trackedRef.current) {
       trackedRef.current = true
       // Track restricted image view attempt
       trackImageView({
@@ -47,7 +55,7 @@ export const PostHero: React.FC<{
         userEmail: currentUser?.email,
       })
     }
-  }, [isSubscriptionLoading, isSubscribed, displayImage, post.id, title, currentUser])
+  }, [isSubscriptionLoading, isGuestAccessLoading, canViewImage, displayImage, post.id, title, currentUser])
 
   return (
     <div className="relative -mt-[10.4rem] flex items-end" style={{ paddingTop: '22rem' }}>
@@ -116,7 +124,8 @@ export const PostHero: React.FC<{
               resource={displayImage}
               postId={post.id}
               postTitle={title}
-              disableThrottling={true} // Subscribers see full image, no throttling needed
+              guestBookable={guestBookable}
+              disableThrottling={canViewImage}
             />
           </motion.div>
         ) : (

@@ -7,10 +7,11 @@ import React, { Fragment } from 'react'
 import type { Post } from '@/payload-types'
 
 import { Media } from '@/components/Media'
-import { useSubscription } from '@/hooks/useSubscription'
 import { useCardDisplayImage } from './useCardDisplayImage'
 
-export type CardPostData = Pick<Post, 'id' | 'slug' | 'categories' | 'meta' | 'title' | 'heroImage'>
+export type CardPostData = Pick<Post, 'id' | 'slug' | 'categories' | 'meta' | 'title' | 'heroImage'> & {
+  guestBookable?: boolean
+}
 
 export const Card: React.FC<{
   alignItems?: 'center'
@@ -22,9 +23,7 @@ export const Card: React.FC<{
 }> = (props) => {
   const { card, link } = useClickableCard({})
   const { className, doc, relationTo, showCategories, title: titleFromProps } = props
-  const { isSubscribed } = useSubscription()
-
-  const { id, slug, categories, meta, title } = doc || {}
+  const { id, slug, categories, meta, title, guestBookable } = doc || {}
   const { description } = meta || {}
   const { displayImage, isLoading: isImageLoading } = useCardDisplayImage(doc)
 
@@ -53,7 +52,7 @@ export const Card: React.FC<{
             size="33vw"
             postId={typeof id === 'string' ? id : undefined}
             postTitle={titleToUse}
-            disableThrottling={isSubscribed}
+            guestBookable={guestBookable}
           />
         )}
       </div>

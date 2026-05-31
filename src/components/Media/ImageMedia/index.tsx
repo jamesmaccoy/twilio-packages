@@ -11,6 +11,7 @@ import type { Props as MediaProps } from '../types'
 import { cssVariables } from '@/cssVariables'
 import { getMediaUrl } from '@/utilities/getMediaUrl'
 import { useSubscription } from '@/hooks/useSubscription'
+import { usePostGuestBookable } from '@/hooks/usePostGuestBookable'
 import { trackImageView } from '@/lib/imageTracking'
 import { useUserContext } from '@/context/UserContext'
 import { MembersOnlyImageOverlay } from '../MembersOnlyImageOverlay'
@@ -25,6 +26,7 @@ const placeholderBlur =
 interface ImageMediaProps extends MediaProps {
   postId?: string
   postTitle?: string
+  guestBookable?: boolean
   disableThrottling?: boolean // Allow opt-out for specific images
 }
 
@@ -41,10 +43,15 @@ export const ImageMedia: React.FC<ImageMediaProps> = (props) => {
     loading: loadingFromProps,
     postId,
     postTitle,
+    guestBookable: guestBookableFromServer,
     disableThrottling = false,
   } = props
 
   const { isSubscribed, isLoading: isSubscriptionLoading } = useSubscription()
+  const { guestBookable, isLoading: isGuestAccessLoading } = usePostGuestBookable(
+    postId,
+    guestBookableFromServer,
+  )
   const { currentUser } = useUserContext()
   const [imageLoaded, setImageLoaded] = useState(false)
   const trackedRef = useRef(false)
@@ -72,10 +79,13 @@ export const ImageMedia: React.FC<ImageMediaProps> = (props) => {
 
   // Determine if image should be throttled (blurred) for non-subscribers
   // Only throttle post cover/meta images, not all images
+  const canViewFullImage = isSubscribed || guestBookable
+
   const shouldThrottle =
     !disableThrottling &&
     !isSubscriptionLoading &&
-    !isSubscribed &&
+    !isGuestAccessLoading &&
+    !canViewFullImage &&
     Boolean(postId || postTitle)
 
   // Track image view when loaded (especially for restricted content)
