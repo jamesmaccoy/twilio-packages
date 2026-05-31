@@ -47,6 +47,7 @@ export const Card: React.FC<{
         {displayImage && (
           <Media
             fill
+            className="absolute inset-0 h-full w-full"
             imgClassName="object-cover"
             resource={displayImage}
             size="33vw"

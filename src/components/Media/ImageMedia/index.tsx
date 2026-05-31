@@ -101,12 +101,18 @@ export const ImageMedia: React.FC<ImageMediaProps> = (props) => {
   // We combine this with CSS blur and low quality settings for maximum effect
 
   return (
-    <picture className={cn(pictureClassName, shouldThrottle && 'relative')}>
+    <div
+      className={cn(
+        'relative overflow-hidden',
+        fill && 'h-full w-full',
+        pictureClassName,
+      )}
+    >
       <NextImage
         alt={alt || ''}
         className={cn(
           imgClassName,
-          shouldThrottle && 'blur-md filter brightness-75' // Additional CSS blur for non-subscribers
+          shouldThrottle && 'blur-md filter brightness-75', // Additional CSS blur for non-subscribers
         )}
         fill={fill}
         height={!fill ? height : undefined}
@@ -121,13 +127,13 @@ export const ImageMedia: React.FC<ImageMediaProps> = (props) => {
         onLoad={() => setImageLoaded(true)}
       />
       {shouldThrottle && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/20 z-10 pointer-events-none">
-          <div className="text-white/90 text-center px-4 py-2 bg-black/50 rounded backdrop-blur-sm border border-white/10">
-            <p className="text-sm font-semibold">For members only</p>
-            <p className="text-xs text-white/80 mt-1">Subscribe to view full image</p>
+        <div className="absolute inset-0 z-10 flex items-center justify-center overflow-hidden bg-black/20 p-2 pointer-events-none">
+          <div className="max-w-full text-center rounded border border-white/10 bg-black/50 px-3 py-2 backdrop-blur-sm">
+            <p className="text-xs font-semibold leading-snug text-white/90 sm:text-sm">For members only</p>
+            <p className="mt-0.5 text-[10px] leading-snug text-white/80 sm:text-xs">Subscribe to view full image</p>
           </div>
         </div>
       )}
-    </picture>
+    </div>
   )
 }
