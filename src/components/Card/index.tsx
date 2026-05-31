@@ -7,8 +7,10 @@ import React, { Fragment } from 'react'
 import type { Post } from '@/payload-types'
 
 import { Media } from '@/components/Media'
+import { useSubscription } from '@/hooks/useSubscription'
+import { useCardDisplayImage } from './useCardDisplayImage'
 
-export type CardPostData = Pick<Post, 'slug' | 'categories' | 'meta' | 'title' | 'heroImage'>
+export type CardPostData = Pick<Post, 'id' | 'slug' | 'categories' | 'meta' | 'title' | 'heroImage'>
 
 export const Card: React.FC<{
   alignItems?: 'center'
@@ -20,9 +22,11 @@ export const Card: React.FC<{
 }> = (props) => {
   const { card, link } = useClickableCard({})
   const { className, doc, relationTo, showCategories, title: titleFromProps } = props
+  const { isSubscribed } = useSubscription()
 
-  const { slug, categories, meta, title } = doc || {}
-  const { description, image: metaImage } = meta || {}
+  const { id, slug, categories, meta, title } = doc || {}
+  const { description } = meta || {}
+  const { displayImage, isLoading: isImageLoading } = useCardDisplayImage(doc)
 
   const hasCategories = categories && Array.isArray(categories) && categories.length > 0
   const titleToUse = titleFromProps || title
@@ -37,14 +41,18 @@ export const Card: React.FC<{
       )}
       ref={card.ref}
     >
-      <div className="relative w-full ">
-        {!metaImage && <div className="">No image</div>}
-        {metaImage && typeof metaImage !== 'string' && (
-          <Media 
-            resource={metaImage} 
+      <div className="relative w-full aspect-[4/3]">
+        {isImageLoading && <div className="absolute inset-0 bg-muted animate-pulse" aria-hidden="true" />}
+        {!displayImage && !isImageLoading && <div className="">No image</div>}
+        {displayImage && (
+          <Media
+            fill
+            imgClassName="object-cover"
+            resource={displayImage}
             size="33vw"
-            postId={id}
+            postId={typeof id === 'string' ? id : undefined}
             postTitle={titleToUse}
+            disableThrottling={isSubscribed}
           />
         )}
       </div>

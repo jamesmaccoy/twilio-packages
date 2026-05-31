@@ -45,6 +45,7 @@ export const Posts: CollectionConfig<'posts'> = {
     categories: true,
     wifi: true,
     lockbox: true,
+    heroImage: true,
     meta: {
       image: true,
       description: true,

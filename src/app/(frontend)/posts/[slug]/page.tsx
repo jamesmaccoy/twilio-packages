@@ -17,6 +17,7 @@ import { generateMeta } from '@/utilities/generateMeta'
 import PageClient from './page.client'
 import { LivePreviewListener } from '@/components/LivePreviewListener'
 import { getPostPackageAccessIndex } from '@/lib/post-package-access'
+import { populateRelatedPostsMedia } from '@/utilities/populatePostMediaFields'
 
 export async function generateStaticParams() {
   const payload = await getPayload({ config: configPromise })
@@ -165,9 +166,15 @@ const queryPostBySlug = cache(async ({ slug }: { slug: string }) => {
     return null
   }
 
+  // depth:1 leaves nested relatedPosts.heroImage/meta.image as IDs — populate for Card thumbnails
+  const relatedPosts = post.relatedPosts?.length
+    ? await populateRelatedPostsMedia(payload, post.relatedPosts as Post['relatedPosts'])
+    : post.relatedPosts
+
   // Return post with guaranteed id
   return {
     ...post,
     id: postId,
+    relatedPosts,
   } as Post
 })
