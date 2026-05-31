@@ -47,13 +47,6 @@ import { yocoService, YocoProduct, YocoPaymentLink } from '@/lib/yocoService'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Mic, MicOff } from 'lucide-react'
 import { PackageDisplay } from '@/components/PackageDisplay'
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from '@/components/ui/carousel'
 
 interface Package {
   id: string
@@ -74,7 +67,14 @@ interface Package {
 interface Message {
   role: 'user' | 'assistant' | 'system'
   content: string
-  type?: 'text' | 'package_suggestion' | 'booking_summary' | 'quick_action' | 'date_selection' | 'date_suggestion'
+  type?:
+    | 'text'
+    | 'package_suggestion'
+    | 'booking_summary'
+    | 'quick_action'
+    | 'date_selection'
+    | 'date_suggestion'
+    | 'addon_selection'
   data?: any
 }
 
@@ -259,7 +259,6 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
   }
   const [suggestedAddons, setSuggestedAddons] = useState<AddonPackage[]>([])
   const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set())
-  const [isLoadingAddons, setIsLoadingAddons] = useState(false)
   
   // Booking states
   const [isBooking, setIsBooking] = useState(false)
@@ -328,7 +327,6 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
   const [checkpoints, setCheckpoints] = useState<EstimateCheckpoint[]>([])
   
   // Suggested dates state (for showing near input)
-  const [suggestedDates, setSuggestedDates] = useState<Array<{ startDate: string; endDate: string; duration: number }>>([])
   // Proactive date suggestions for PromptInput header
   const [dateSuggestions, setDateSuggestions] = useState<Array<{ startDate: Date; endDate: Date; label: string; dayRange?: string }>>([])
   
@@ -357,6 +355,8 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
 
   // Ref to prevent duplicate package suggestions for same selection
   const lastPackageSuggestionKeyRef = useRef<string | null>(null)
+  const lastAddonSuggestionKeyRef = useRef<string | null>(null)
+  const lastDateSuggestionKeyRef = useRef<string | null>(null)
   
   // Ref to store original packages for re-filtering
   const originalPackagesRef = useRef<Package[]>([])
@@ -463,6 +463,8 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
       const nextThreadId = activeThreadRef.current + 1
       activeThreadRef.current = nextThreadId
       packagesSuggestedRef.current = false
+      lastAddonSuggestionKeyRef.current = null
+      lastDateSuggestionKeyRef.current = null
       setMessages(initialMessages)
       persistHistoryEntries(nextThreadId, initialMessages)
       return nextThreadId
@@ -826,13 +828,6 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
         // 1. If explicitly requested (addMessage = true) AND dates are unavailable - always show
         // 2. If availability changed from available to unavailable - show to notify user
         // 3. Store suggested dates in state for display near input field
-        if (!isAvailable && suggestedDates.length > 0) {
-          setSuggestedDates(suggestedDates)
-        } else if (isAvailable) {
-          // Clear suggested dates if dates are available
-          setSuggestedDates([])
-        }
-        
         // 4. Show message if explicitly requested or if availability changed
         const shouldShowMessage = 
           (addMessage && !isAvailable) || // Explicitly requested and unavailable
@@ -844,7 +839,11 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
             content: `I'm sorry, but the dates you selected (${format(fromDate, 'MMM dd')} to ${format(
               toDate,
               'MMM dd, yyyy',
-            )}) are not available.${suggestedDates.length > 0 ? ' Please see suggested dates below.' : ' Please select different dates for your stay.'}`,
+            )}) are not available.${
+              suggestedDates.length > 0
+                ? ' Try one of these alternatives:'
+                : ' Please pick different dates using Select Dates.'
+            }`,
             type: 'text',
           }
           console.log('💬 Adding availability message:', {
@@ -855,6 +854,34 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
             message: availabilityMessage,
           })
           appendMessageToThread(threadId, availabilityMessage)
+
+          if (!isAvailable && suggestedDates.length > 0) {
+            const suggestionKey = `${fromDate.toISOString()}-${toDate.toISOString()}`
+            if (lastDateSuggestionKeyRef.current !== suggestionKey) {
+              lastDateSuggestionKeyRef.current = suggestionKey
+              appendMessageToThread(threadId, {
+                role: 'assistant',
+                content: '',
+                type: 'date_suggestion',
+                data: { suggestedDates },
+              })
+            }
+          }
+        } else if (
+          !isAvailable &&
+          suggestedDates.length > 0 &&
+          activeThreadRef.current === threadId
+        ) {
+          const suggestionKey = `${fromDate.toISOString()}-${toDate.toISOString()}`
+          if (lastDateSuggestionKeyRef.current !== suggestionKey) {
+            lastDateSuggestionKeyRef.current = suggestionKey
+            appendMessageToThread(threadId, {
+              role: 'assistant',
+              content: 'These dates are not available. Try one of these alternatives:',
+              type: 'date_suggestion',
+              data: { suggestedDates },
+            })
+          }
         }
         
         return isAvailable
@@ -1164,56 +1191,57 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
     }
   }, [isInitialized])
 
-  // Load add-ons when package and dates are selected (entitlement-filtered server-side; no AI required).
-  const loadAndSuggestAddons = useCallback(async () => {
-    if (!selectedPackage || !startDate || !endDate || !isLoggedIn) {
-      setSuggestedAddons([])
-      return
-    }
+  const fetchAddonsList = useCallback(async (): Promise<AddonPackage[]> => {
+    if (!startDate || !endDate || !isLoggedIn) return []
 
-    setIsLoadingAddons(true)
-    try {
-      const addonsResponse = await fetch(`/api/packages/addons/${postId}`, {
-        credentials: 'include',
-        cache: 'no-store',
-      })
-      if (!addonsResponse.ok) {
-        throw new Error('Failed to fetch addons')
+    const addonsResponse = await fetch(`/api/packages/addons/${postId}`, {
+      credentials: 'include',
+      cache: 'no-store',
+    })
+    if (!addonsResponse.ok) return []
+
+    const addonsData = await addonsResponse.json()
+    const availableAddons: any[] = Array.isArray(addonsData?.addons) ? addonsData.addons : []
+    const sorted = [...availableAddons].sort(
+      (a, b) => (Number(a.baseRate) || 0) - (Number(b.baseRate) || 0),
+    )
+
+    return sorted.map((addon) => ({
+      id: addon.id,
+      name: addon.name,
+      description: addon.description || '',
+      baseRate: addon.baseRate || 0,
+      enabled: false,
+      features: addon.features || [],
+    }))
+  }, [startDate, endDate, postId, isLoggedIn])
+
+  /** Show add-ons inside the chat (Get Recommendations / package pick), not in the footer. */
+  const appendAddonSelectionMessage = useCallback(
+    async (threadId: number) => {
+      if (!isLoggedIn || !startDate || !endDate || activeThreadRef.current !== threadId) return
+
+      const dedupeKey = `${threadId}-${selectedPackage?.id ?? 'post'}`
+      if (lastAddonSuggestionKeyRef.current === dedupeKey) return
+
+      try {
+        const addons = await fetchAddonsList()
+        if (activeThreadRef.current !== threadId || addons.length === 0) return
+
+        setSuggestedAddons(addons)
+        lastAddonSuggestionKeyRef.current = dedupeKey
+        appendMessageToThread(threadId, {
+          role: 'assistant',
+          content: 'Optional add-ons for your stay (tap to include):',
+          type: 'addon_selection',
+          data: { addons },
+        })
+      } catch (error) {
+        console.error('Error loading addons:', error)
       }
-      const addonsData = await addonsResponse.json()
-      const availableAddons: any[] = Array.isArray(addonsData?.addons) ? addonsData.addons : []
-
-      const sorted = [...availableAddons].sort(
-        (a, b) => (Number(a.baseRate) || 0) - (Number(b.baseRate) || 0),
-      )
-
-      setSuggestedAddons(
-        sorted.map((addon) => ({
-          id: addon.id,
-          name: addon.name,
-          description: addon.description || '',
-          baseRate: addon.baseRate || 0,
-          enabled: false,
-          features: addon.features || [],
-        })),
-      )
-    } catch (error) {
-      console.error('Error loading addons:', error)
-      setSuggestedAddons([])
-    } finally {
-      setIsLoadingAddons(false)
-    }
-  }, [selectedPackage, startDate, endDate, postId, isLoggedIn])
-
-  // Load addons when package and dates change
-  useEffect(() => {
-    if (selectedPackage && startDate && endDate && isLoggedIn) {
-      loadAndSuggestAddons()
-    } else {
-      setSuggestedAddons([])
-      setSelectedAddons(new Set())
-    }
-  }, [selectedPackage?.id, startDate, endDate, isLoggedIn, loadAndSuggestAddons])
+    },
+    [appendMessageToThread, fetchAddonsList, isLoggedIn, selectedPackage?.id, startDate, endDate],
+  )
 
   // Initialize speech recognition and synthesis
   useEffect(() => {
@@ -1828,12 +1856,23 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
           appendMessageToThread(threadId, acknowledgmentMessage)
         }
         
+        const pickerSuggestions = dateSuggestions.map((s) => ({
+          startDate: s.startDate.toISOString(),
+          endDate: s.endDate.toISOString(),
+          duration: Math.max(
+            1,
+            Math.ceil((s.endDate.getTime() - s.startDate.getTime()) / (24 * 60 * 60 * 1000)),
+          ),
+          label: s.label,
+        }))
+
         const dateMessage: Message = {
           role: 'assistant',
-          content: startDate && endDate ? 
-            'You can modify your dates below if needed:' : 
-            'Please select your check-in and check-out dates:',
-          type: 'date_selection'
+          content: startDate && endDate ?
+            'You can modify your dates below, or pick a suggested range:' :
+            'Choose your check-in and check-out dates, or tap a suggestion:',
+          type: 'date_selection',
+          data: { pickerSuggestions },
         }
         appendMessageToThread(threadId, dateMessage)
         return
@@ -1863,8 +1902,10 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
           const assistantMessage: Message = { role: 'assistant', content: message, type: 'text' }
           appendMessageToThread(threadId, assistantMessage)
           
-          // Show packages after the recommendation message
-          setTimeout(() => showAvailablePackages(threadId), 1000)
+          setTimeout(() => {
+            showAvailablePackages(threadId)
+            void appendAddonSelectionMessage(threadId)
+          }, 1000)
           return
         } else {
           message = `I'd love to give you personalized recommendations! To suggest the best packages for your needs, please select your travel dates first using the "Select Dates" button above.`
@@ -1882,7 +1923,10 @@ export const SmartEstimateBlock: React.FC<SmartEstimateBlockProps> = ({
               message = `Great! Your dates (${format(startDate, 'MMM dd')} to ${format(endDate, 'MMM dd, yyyy')}) are available. Here are my recommendations for your ${duration} ${duration === 1 ? 'night' : 'nights'} stay:`
               const assistantMessage: Message = { role: 'assistant', content: message, type: 'text' }
               appendMessageToThread(threadId, assistantMessage)
-              setTimeout(() => showAvailablePackages(threadId), 1000)
+              setTimeout(() => {
+                showAvailablePackages(threadId)
+                void appendAddonSelectionMessage(threadId)
+              }, 1000)
             } else {
               // Dates not available - availability check will show suggestions
               return
@@ -2760,12 +2804,14 @@ ${parsedDates.startDate && parsedDates.endDate ? `\nIMPORTANT: User just request
                 onClick={() => {
                   userSelectedPackageRef.current = true
                   setSelectedPackage(pkg)
+                  lastAddonSuggestionKeyRef.current = null
                   const confirmMessage: Message = {
                     role: 'assistant',
                     content: `Great choice! You've selected "${pkg.name}". This package includes: ${pkg.features.join(', ')}. Would you like to proceed with booking or do you have any questions?`,
                     type: 'text'
                   }
                   appendMessageToThread(activeThreadRef.current, confirmMessage)
+                  void appendAddonSelectionMessage(activeThreadRef.current)
                 }}
               >
                 <div className="p-5 border-b border-zinc-100 dark:border-zinc-700 bg-gradient-to-br from-teal-50/50 dark:from-teal-900/20 to-transparent">
@@ -2807,13 +2853,7 @@ ${parsedDates.startDate && parsedDates.endDate ? `\nIMPORTANT: User just request
     
     if (message.type === 'date_suggestion') {
       const { suggestedDates } = message.data || { suggestedDates: [] }
-      console.log('🎯 Rendering date_suggestion message:', {
-        messageType: message.type,
-        suggestedDatesCount: suggestedDates.length,
-        suggestedDates,
-        messageData: message.data,
-      })
-      
+
       if (!suggestedDates || suggestedDates.length === 0) {
         console.warn('⚠️ date_suggestion message has no suggestedDates')
         // Fall back to text message if no suggestions
@@ -2827,7 +2867,7 @@ ${parsedDates.startDate && parsedDates.endDate ? `\nIMPORTANT: User just request
       return (
         <Message key={index} from="assistant">
           <MessageContent>
-            <MessageResponse>{message.content}</MessageResponse>
+            {message.content ? <MessageResponse>{message.content}</MessageResponse> : null}
             {suggestedDates.length > 0 && (
               <div className="mt-4">
                 <Suggestions>
@@ -2875,16 +2915,61 @@ ${parsedDates.startDate && parsedDates.endDate ? `\nIMPORTANT: User just request
       )
     }
     
-    if (message.type === 'date_selection') {
-      // Log when date selection UI is rendered to verify unavailableDates are loaded
-      console.log('📅 Date selection UI rendered:', {
-        unavailableDatesCount: unavailableDates.length,
-        unavailableDates: unavailableDates.slice(0, 5),
-        isLoggedIn,
-      })
-      
+    if (message.type === 'addon_selection') {
+      const addons: AddonPackage[] = message.data?.addons || []
+      if (addons.length === 0) return null
+
       return (
-        <div key={index} className="space-y-4">
+        <Message key={index} from="assistant">
+          <MessageContent>
+            <MessageResponse>{message.content}</MessageResponse>
+            <Suggestions className="mt-3">
+              {addons.map((addon) => {
+                const isSelected = selectedAddons.has(addon.id)
+                return (
+                  <Suggestion
+                    key={addon.id}
+                    suggestion={`${addon.name} (+R${addon.baseRate.toFixed(0)})`}
+                    variant={isSelected ? 'default' : 'outline'}
+                    className={cn(
+                      'text-xs',
+                      isSelected && 'bg-teal-500 text-white hover:bg-teal-600 border-teal-500',
+                    )}
+                    onClick={() => {
+                      const newSelected = new Set(selectedAddons)
+                      if (isSelected) {
+                        newSelected.delete(addon.id)
+                      } else {
+                        newSelected.add(addon.id)
+                      }
+                      setSelectedAddons(newSelected)
+                      appendMessageToThread(activeThreadRef.current, {
+                        role: 'assistant',
+                        content: isSelected
+                          ? `Removed "${addon.name}" from your booking.`
+                          : `Added "${addon.name}" (+R${addon.baseRate.toFixed(0)}).`,
+                        type: 'text',
+                      })
+                    }}
+                  />
+                )
+              })}
+            </Suggestions>
+          </MessageContent>
+        </Message>
+      )
+    }
+
+    if (message.type === 'date_selection') {
+      const pickerSuggestions: Array<{
+        startDate: string
+        endDate: string
+        duration: number
+        label?: string
+      }> = message.data?.pickerSuggestions || []
+
+      return (
+        <div key={index} className="space-y-3">
           <div className="bg-muted dark:bg-zinc-800 p-3 rounded-lg">
             <p className="text-sm text-slate-900 dark:text-slate-100">{message.content}</p>
             {startDate && endDate && (
@@ -2893,6 +2978,40 @@ ${parsedDates.startDate && parsedDates.endDate ? `\nIMPORTANT: User just request
               </p>
             )}
           </div>
+          {pickerSuggestions.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground dark:text-slate-400">Suggested dates</p>
+              <Suggestions>
+                {pickerSuggestions.map((suggestion, idx) => {
+                  const suggestionStart = new Date(suggestion.startDate)
+                  const suggestionEnd = new Date(suggestion.endDate)
+                  if (isNaN(suggestionStart.getTime()) || isNaN(suggestionEnd.getTime())) return null
+                  const suggestionText =
+                    suggestion.label ||
+                    `${format(suggestionStart, 'MMM dd')} - ${format(suggestionEnd, 'MMM dd')}`
+                  return (
+                    <Suggestion
+                      key={idx}
+                      suggestion={suggestionText}
+                      onClick={() => {
+                        setStartDate(suggestionStart)
+                        setEndDate(suggestionEnd)
+                        setDuration(suggestion.duration)
+                        preservedStartDateRef.current = suggestionStart
+                        checkDateAvailability(suggestionStart, suggestionEnd, activeThreadRef.current, false)
+                        appendMessageToThread(activeThreadRef.current, {
+                          role: 'assistant',
+                          content: `Updated to ${format(suggestionStart, 'MMM dd')} - ${format(suggestionEnd, 'MMM dd, yyyy')} (${suggestion.duration} ${suggestion.duration === 1 ? 'night' : 'nights'}).`,
+                          type: 'text',
+                        })
+                      }}
+                      className="text-xs"
+                    />
+                  )
+                })}
+              </Suggestions>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-xs text-muted-foreground dark:text-slate-400 mb-1 block">Start Date</label>
@@ -3080,39 +3199,6 @@ ${parsedDates.startDate && parsedDates.endDate ? `\nIMPORTANT: User just request
               </Popover>
             </div>
           </div>
-          {/* Show suggested dates when unavailable */}
-          {suggestedDates.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground dark:text-slate-400">Suggested available dates:</p>
-              <Suggestions>
-                {suggestedDates.map((suggestion, idx) => {
-                  const suggestionStart = new Date(suggestion.startDate)
-                  const suggestionEnd = new Date(suggestion.endDate)
-                  
-                  if (isNaN(suggestionStart.getTime()) || isNaN(suggestionEnd.getTime())) {
-                    return null
-                  }
-                  
-                  const suggestionText = `${format(suggestionStart, 'MMM dd')} - ${format(suggestionEnd, 'MMM dd')}`
-                  
-                  return (
-                    <Suggestion
-                      key={idx}
-                      suggestion={suggestionText}
-                      onClick={() => {
-                        setStartDate(suggestionStart)
-                        setEndDate(suggestionEnd)
-                        setDuration(suggestion.duration)
-                        preservedStartDateRef.current = suggestionStart
-                        setSuggestedDates([]) // Clear suggestions after selection
-                        checkDateAvailability(suggestionStart, suggestionEnd, activeThreadRef.current, false)
-                      }}
-                    />
-                  )
-                })}
-              </Suggestions>
-            </div>
-          )}
           <div className="flex gap-2 items-center">
             <div className="flex items-center gap-2 px-3 py-1.5 border border-zinc-200 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-800">
               <Switch
@@ -3431,6 +3517,8 @@ ${parsedDates.startDate && parsedDates.endDate ? `\nIMPORTANT: User just request
                 setBookingError(null)
                 setSelectedAddons(new Set())
                 setSuggestedAddons([])
+                lastAddonSuggestionKeyRef.current = null
+                lastDateSuggestionKeyRef.current = null
                 // Reset refs to allow new package suggestions
                 packagesSuggestedRef.current = false
                 estimateLoadedRef.current = false
@@ -3611,148 +3699,6 @@ ${parsedDates.startDate && parsedDates.endDate ? `\nIMPORTANT: User just request
               )}
             </div>
           </motion.div>
-        )}
-
-        {/* Suggested add-ons — compact strip */}
-        {selectedPackage && startDate && endDate && (
-          <div className="mb-2 shrink-0">
-            {isLoadingAddons ? (
-              <div className="flex h-8 items-center justify-center gap-1.5 rounded-md border border-zinc-200 bg-white px-2 dark:border-zinc-700 dark:bg-zinc-800">
-                <Loader2 className="h-3 w-3 animate-spin text-teal-500" />
-                <span className="text-[10px] text-slate-500 dark:text-slate-400">Add-ons…</span>
-              </div>
-            ) : suggestedAddons.length > 0 ? (
-              <div className="space-y-1">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                  Add-ons
-                </p>
-                <Carousel
-                  opts={{ align: 'start', loop: suggestedAddons.length > 1 }}
-                  className="relative w-full px-6"
-                >
-                  <CarouselContent className="-ml-1.5">
-                    {suggestedAddons.map((addon) => {
-                      const isSelected = selectedAddons.has(addon.id)
-                      return (
-                        <CarouselItem
-                          key={addon.id}
-                          className="pl-1.5 basis-[9.5rem] sm:basis-[10.5rem]"
-                        >
-                          <div
-                            className={cn(
-                              'flex h-8 items-center gap-1.5 rounded-md border px-2 transition-colors',
-                              isSelected
-                                ? 'border-teal-400/80 bg-teal-50/60 dark:border-teal-600 dark:bg-teal-900/25'
-                                : 'border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-800',
-                            )}
-                          >
-                            <div className="min-w-0 flex-1 leading-none">
-                              <p
-                                className="truncate text-[11px] font-medium text-slate-800 dark:text-slate-100"
-                                title={addon.name}
-                              >
-                                {addon.name}
-                              </p>
-                              <p className="text-[10px] text-teal-600 dark:text-teal-400">
-                                +R{addon.baseRate.toFixed(0)}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              aria-pressed={isSelected}
-                              aria-label={isSelected ? `Remove ${addon.name}` : `Add ${addon.name}`}
-                              onClick={() => {
-                                const newSelected = new Set(selectedAddons)
-                                if (isSelected) {
-                                  newSelected.delete(addon.id)
-                                } else {
-                                  newSelected.add(addon.id)
-                                }
-                                setSelectedAddons(newSelected)
-                                appendMessageToThread(activeThreadRef.current, {
-                                  role: 'assistant',
-                                  content: isSelected
-                                    ? `Removed "${addon.name}" addon from your booking.`
-                                    : `Added "${addon.name}" addon (+R${addon.baseRate.toFixed(0)}) to your booking.`,
-                                  type: 'text',
-                                })
-                              }}
-                              className={cn(
-                                'relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors',
-                                isSelected ? 'bg-teal-500' : 'bg-zinc-200 dark:bg-zinc-600',
-                              )}
-                            >
-                              <span
-                                className={cn(
-                                  'inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform',
-                                  isSelected ? 'translate-x-3.5' : 'translate-x-0.5',
-                                )}
-                              />
-                            </button>
-                          </div>
-                        </CarouselItem>
-                      )
-                    })}
-                  </CarouselContent>
-                  {suggestedAddons.length > 1 ? (
-                    <>
-                      <CarouselPrevious className="left-0 top-1/2 h-5 w-5 -translate-y-1/2 border-zinc-200 p-0 dark:border-zinc-600 [&_svg]:h-3 [&_svg]:w-3" />
-                      <CarouselNext className="right-0 top-1/2 h-5 w-5 -translate-y-1/2 border-zinc-200 p-0 dark:border-zinc-600 [&_svg]:h-3 [&_svg]:w-3" />
-                    </>
-                  ) : null}
-                </Carousel>
-              </div>
-            ) : null}
-          </div>
-        )}
-
-        {/* Date Suggestions */}
-        {dateSuggestions.length > 0 && (
-          <div className="mb-3 overflow-x-auto scrollbar-none pb-1">
-            <div className="flex gap-2 w-max">
-              {dateSuggestions.map((suggestion, i) => {
-                const startDay = format(suggestion.startDate, 'EEE')
-                const endDay = format(suggestion.endDate, 'EEE')
-                const dateRange = `${format(suggestion.startDate, 'MMM dd')} - ${format(suggestion.endDate, 'MMM dd')}`
-                const dayRange = `${startDay} - ${endDay}`
-                
-                return (
-                  <motion.button
-                    key={i}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => {
-                      const newStartDate = suggestion.startDate
-                      const newEndDate = suggestion.endDate
-                      const newDuration = Math.ceil((suggestion.endDate.getTime() - suggestion.startDate.getTime()) / (24 * 60 * 60 * 1000))
-                      
-                      setStartDate(newStartDate)
-                      setEndDate(newEndDate)
-                      setDuration(newDuration)
-                      preservedStartDateRef.current = newStartDate
-                      
-                      // Check availability
-                      checkDateAvailability(newStartDate, newEndDate, activeThreadRef.current, false).then((isAvailable) => {
-                        // Notify the assistant about the date selection
-                        const confirmMessage: Message = {
-                          role: 'assistant',
-                          content: isAvailable
-                            ? `Great! I've updated your dates to ${format(newStartDate, 'MMM dd')} - ${format(newEndDate, 'MMM dd, yyyy')} (${newDuration} ${newDuration === 1 ? 'night' : 'nights'}). These dates are available for booking.`
-                            : `I've updated your dates to ${format(newStartDate, 'MMM dd')} - ${format(newEndDate, 'MMM dd, yyyy')} (${newDuration} ${newDuration === 1 ? 'night' : 'nights'}), but these dates may not be available. Please check availability.`,
-                          type: 'text'
-                        }
-                        appendMessageToThread(activeThreadRef.current, confirmMessage)
-                      })
-                    }}
-                    className="text-xs font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-3 py-2 rounded-full transition-colors whitespace-nowrap hover:text-teal-600 dark:hover:text-teal-400 hover:bg-zinc-50 dark:hover:bg-zinc-700 flex flex-col items-center gap-0.5"
-                  >
-                    <span className="font-semibold">{dateRange}</span>
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500">{dayRange}</span>
-                  </motion.button>
-                )
-              })}
-            </div>
-          </div>
         )}
 
         {/* Input Form */}
