@@ -403,7 +403,7 @@ export function HomepageEditorial({ featuredPosts = [] }: HomepageEditorialProps
 
       {/* Cinematic Video Section */}
       <CinematicSection
-        videoUrl="https://youtube.com/shorts/kSWCaxAttHg?si=4NbhwEo96rNVQgVA"
+        videoUrl="https://youtube.com/shorts/J0VM_RmWLds"
         title="Unforgettable Moments"
         subtitle="Experience"
         ctaText="Discover Our Story"
