@@ -22,7 +22,5 @@ export interface Props {
   // Post context for image throttling and tracking
   postId?: string
   postTitle?: string
-  /** When true, non-subscribers see full images (post has entitlement "none" packages). */
-  guestBookable?: boolean
   disableThrottling?: boolean // Allow opt-out for specific images
 }

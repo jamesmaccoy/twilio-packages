@@ -179,22 +179,15 @@ export function HomepageEditorial({ featuredPosts = [] }: HomepageEditorialProps
   }, [activeCategoryId, posts])
 
   const [packagesByPostId, setPackagesByPostId] = useState<Record<string, PackageListItem[]>>({})
-  const [guestBookableByPostId, setGuestBookableByPostId] = useState<Record<string, boolean>>({})
   const [packagesLoading, setPackagesLoading] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     // Load packages once per visible post. Stay length only affects which package we highlight
     // (`selectBestPackage` uses `nights`); the package list for a post does not depend on dates.
     const visible = filteredPosts.slice(0, 12)
-    const postIdsToLoad = new Set<string>()
     for (const post of visible) {
-      const id = String((post as any)?.id || '')
-      if (id) postIdsToLoad.add(id)
-    }
-    if (posts[1]?.id) postIdsToLoad.add(String(posts[1].id))
-    if (cityEditorialPost?.id) postIdsToLoad.add(String(cityEditorialPost.id))
-
-    for (const postId of postIdsToLoad) {
+      const postId = String((post as any)?.id || '')
+      if (!postId) continue
       if (Object.prototype.hasOwnProperty.call(packagesByPostId, postId) || packagesLoading[postId]) continue
 
       setPackagesLoading((prev) => ({ ...prev, [postId]: true }))
@@ -202,18 +195,11 @@ export function HomepageEditorial({ featuredPosts = [] }: HomepageEditorialProps
       fetch(`/api/packages/post/${postId}?context=editorial`, { credentials: 'include' })
         .then(async (res) => {
           if (!res.ok) return { packages: [] as PackageListItem[] }
-          return (await res.json()) as {
-            packages?: PackageListItem[]
-            access?: { guestBookable?: boolean }
-          }
+          return (await res.json()) as { packages?: PackageListItem[] }
         })
         .then((data) => {
           const pkgs = Array.isArray(data?.packages) ? data.packages : []
           setPackagesByPostId((prev) => ({ ...prev, [postId]: pkgs }))
-          if (typeof data?.access?.guestBookable === 'boolean') {
-            const guestBookable = data.access.guestBookable
-            setGuestBookableByPostId((prev) => ({ ...prev, [postId]: guestBookable }))
-          }
         })
         .catch((err) => {
           console.warn('Failed to load packages for post', postId, err)
@@ -224,7 +210,7 @@ export function HomepageEditorial({ featuredPosts = [] }: HomepageEditorialProps
         })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredPosts, posts, cityEditorialPost])
+  }, [filteredPosts])
 
   return (
     <main className="bg-white dark:bg-background min-h-screen w-full overflow-x-hidden text-foreground">
@@ -391,7 +377,6 @@ export function HomepageEditorial({ featuredPosts = [] }: HomepageEditorialProps
                   image={metaImage}
                   postId={postId || undefined}
                   postTitle={title}
-                  guestBookable={postId ? guestBookableByPostId[postId] : undefined}
                   title={title}
                   subtitle={subtitle}
                   description={description}
@@ -430,7 +415,6 @@ export function HomepageEditorial({ featuredPosts = [] }: HomepageEditorialProps
         image={posts[1]?.meta?.image || (posts[1] as any)?.heroImage}
         postId={posts[1]?.id}
         postTitle={posts[1]?.title}
-        guestBookable={posts[1]?.id ? guestBookableByPostId[posts[1].id] : undefined}
         title="Southern Peninsula Escapes"
         subtitle="Cape Point • Hout Bay • Kommetjie"
         description="Discover the raw beauty of the Southern Peninsula. From the dramatic cliffs of Cape Point to the serene beaches of Kommetjie, experience a coastal lifestyle unlike any other."
@@ -443,9 +427,6 @@ export function HomepageEditorial({ featuredPosts = [] }: HomepageEditorialProps
         image={cityEditorialPost?.meta?.image || (cityEditorialPost as any)?.heroImage}
         postId={cityEditorialPost?.id}
         postTitle={cityEditorialPost?.title}
-        guestBookable={
-          cityEditorialPost?.id ? guestBookableByPostId[cityEditorialPost.id] : undefined
-        }
         title="City Centre & Suburbs"
         subtitle="Gardens • Vredehoek • Rondebosch"
         description="Immerse yourself in the vibrant culture of Cape Town. Stay in the heart of the city, surrounded by world-class dining, art, and history, all within reach of the mountain."

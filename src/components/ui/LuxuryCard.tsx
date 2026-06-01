@@ -12,7 +12,6 @@ interface LuxuryCardProps {
   image?: Media | string | null
   postId?: string
   postTitle?: string
-  guestBookable?: boolean
   title: string
   subtitle?: string
   description?: string
@@ -28,7 +27,6 @@ export function LuxuryCard({
   image,
   postId,
   postTitle,
-  guestBookable,
   title,
   subtitle,
   description,
@@ -81,7 +79,6 @@ export function LuxuryCard({
               resource={mediaResource}
               postId={postId}
               postTitle={postTitle || title}
-              guestBookable={guestBookable}
               imgClassName="object-cover transition-transform duration-1000 ease-out group-hover:scale-105"
               size="33vw"
             />

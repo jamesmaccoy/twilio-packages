@@ -11,7 +11,6 @@ interface EditorialSectionProps {
   /** Post context — required for member-only blur + overlay on non-subscribers */
   postId?: string
   postTitle?: string
-  guestBookable?: boolean
   title: string
   subtitle?: string
   description: string
@@ -24,7 +23,6 @@ export function EditorialSection({
   image,
   postId,
   postTitle,
-  guestBookable,
   title,
   subtitle,
   description,
@@ -66,7 +64,6 @@ export function EditorialSection({
                     resource={image}
                     postId={postId}
                     postTitle={postTitle || title}
-                    guestBookable={guestBookable}
                     imgClassName="object-cover"
                     size="(max-width: 768px) 100vw, 50vw"
                   />
