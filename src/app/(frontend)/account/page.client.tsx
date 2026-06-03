@@ -625,24 +625,17 @@ export default function AccountClient({ user }: AccountClientProps) {
                   {[
                     {
                       label: 'Documentation',
-                      href: '#',
+                      href: '/documentation',
                     },
                     {
                       label: 'API Reference',
-                      href: '#',
-                    },
-                    {
-                      label: 'Support Center',
-                      href: '#',
+                      href: '/api',
                     },
                     {
                       label: 'FAQ',
                       href: '/faq',
                     },
-                    {
-                      label: 'Community',
-                      href: '#',
-                    },
+                 
                   ].map((link, idx) => (
                     <Link
                       key={idx}
