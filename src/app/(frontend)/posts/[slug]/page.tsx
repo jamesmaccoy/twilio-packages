@@ -17,7 +17,7 @@ import { generateMeta } from '@/utilities/generateMeta'
 import PageClient from './page.client'
 import { LivePreviewListener } from '@/components/LivePreviewListener'
 import { getPostPackageAccessIndex } from '@/lib/post-package-access'
-import { populateRelatedPostsMedia } from '@/utilities/populatePostMediaFields'
+import { populatePostMediaFields, populateRelatedPostsMedia } from '@/utilities/populatePostMediaFields'
 
 export async function generateStaticParams() {
   const payload = await getPayload({ config: configPromise })
@@ -83,7 +83,7 @@ export default async function Post({ params: paramsPromise }: Args) {
 
       {draft && <LivePreviewListener />}
 
-      <PostHeroWrapper post={post as Post} />
+      <PostHeroWrapper post={post as Post} guestBookable={packageAccess.guestBookable} />
 
       <div className="flex flex-col items-center gap-4 pt-8">
         <div className="container">
@@ -166,14 +166,19 @@ const queryPostBySlug = cache(async ({ slug }: { slug: string }) => {
     return null
   }
 
+  const postWithHero = {
+    ...post,
+    ...(await populatePostMediaFields(payload, post)),
+  } as Post
+
   // depth:1 leaves nested relatedPosts.heroImage/meta.image as IDs — populate for Card thumbnails
-  const relatedPosts = post.relatedPosts?.length
-    ? await populateRelatedPostsMedia(payload, post.relatedPosts as Post['relatedPosts'])
-    : post.relatedPosts
+  const relatedPosts = postWithHero.relatedPosts?.length
+    ? await populateRelatedPostsMedia(payload, postWithHero.relatedPosts)
+    : postWithHero.relatedPosts
 
   // Return post with guaranteed id
   return {
-    ...post,
+    ...postWithHero,
     id: postId,
     relatedPosts,
   } as Post

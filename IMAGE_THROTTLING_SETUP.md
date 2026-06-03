@@ -9,7 +9,7 @@ Image throttling has been implemented to restrict post cover/meta images for non
 ### 1. Subscription-Based Image Access
 - ✅ **Post cover/meta images are completely hidden for non-subscribers** (not just blurred)
 - ✅ Subscribers with active subscriptions see full-quality images
-- ✅ PostHero component checks subscription status and only renders image for subscribers
+- ✅ PostHero shows full hero image for **active subscribers** (profile + `/api/check-subscription`) and posts with **entitlement `none`** packages
 - ✅ Other images (thumbnails, cards) are blurred for non-subscribers
 - ✅ Uses Vercel's free plan throttling + CSS blur for thumbnails
 - ✅ Only applies to post cover/meta images (not all images)
@@ -38,7 +38,7 @@ Image throttling has been implemented to restrict post cover/meta images for non
 - Passes post context to ImageMedia for tracking
 
 #### Updated Components
-- `PostHero`: **Completely hides image for non-subscribers**, only shows for subscribers
+- `PostHero`: Shows full hero for subscribers and guest-bookable posts; dark gradient + “Members only” for others
 - `Card`: Passes post ID and title for tracking (blurs thumbnails)
 - `SuggestedPackages`: Passes post context for package images
 - `EstimatePage`: Passes post context for estimate images
@@ -48,12 +48,13 @@ Image throttling has been implemented to restrict post cover/meta images for non
 ### Image Access Logic
 
 #### PostHero (Post Cover Images)
-1. **Subscription Check**: Uses `useSubscription()` hook to check if user has active subscription
-2. **Access Decision**: 
-   - **Subscribers**: See full-quality image
-   - **Non-subscribers**: Image is completely hidden (not rendered)
-   - Shows gradient background with "Image Withheld - For members only" message
-3. **Tracking**: Tracks when non-subscribers visit post page (restricted content view)
+1. **Access check**: `usePostViewerImageAccess` — Payload user `subscriptionStatus`, `/api/check-subscription`, and server `guestBookable` (entitlement `none` packages)
+2. **Access decision**:
+   - **Subscribers** (active profile or API): Full-quality hero image
+   - **Guest-bookable posts** (`entitlement` includes `none`): Full hero for everyone
+   - **Other non-subscribers**: Dark gradient + “Members only” link (no image)
+   - **While subscription loads**: Dark placeholder (avoids white flash)
+3. **Tracking**: Tracks restricted hero views for non-subscribers without access
 
 #### Other Images (Thumbnails, Cards)
 1. **Subscription Check**: Uses `useSubscription()` hook

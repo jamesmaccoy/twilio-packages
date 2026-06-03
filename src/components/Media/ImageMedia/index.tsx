@@ -13,6 +13,7 @@ import { getMediaUrl } from '@/utilities/getMediaUrl'
 import { useSubscription } from '@/hooks/useSubscription'
 import { trackImageView } from '@/lib/imageTracking'
 import { useUserContext } from '@/context/UserContext'
+import { getCustomerEntitlementFromUser } from '@/utils/packageSuggestions'
 import { MembersOnlyImageOverlay } from '../MembersOnlyImageOverlay'
 
 const { breakpoints } = cssVariables
@@ -46,6 +47,10 @@ export const ImageMedia: React.FC<ImageMediaProps> = (props) => {
 
   const { isSubscribed, isLoading: isSubscriptionLoading } = useSubscription()
   const { currentUser } = useUserContext()
+  const hasSubscriptionFromProfile = Boolean(
+    currentUser && getCustomerEntitlementFromUser(currentUser) !== 'none',
+  )
+  const canViewFullImage = disableThrottling || isSubscribed || hasSubscriptionFromProfile
   const [imageLoaded, setImageLoaded] = useState(false)
   const trackedRef = useRef(false)
 
@@ -73,9 +78,8 @@ export const ImageMedia: React.FC<ImageMediaProps> = (props) => {
   // Determine if image should be throttled (blurred) for non-subscribers
   // Only throttle post cover/meta images, not all images
   const shouldThrottle =
-    !disableThrottling &&
+    !canViewFullImage &&
     !isSubscriptionLoading &&
-    !isSubscribed &&
     Boolean(postId || postTitle)
 
   // Track image view when loaded (especially for restricted content)

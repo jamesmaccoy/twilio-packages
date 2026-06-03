@@ -1,53 +1,56 @@
 'use client'
 
 import { formatDateTime } from 'src/utilities/formatDateTime'
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { Lock } from 'lucide-react'
 
-import type { Post } from '@/payload-types'
+import type { Media, Post } from '@/payload-types'
 
 import { formatAuthors } from '@/utilities/formatAuthors'
-import { Media } from '@/components/Media'
-import { useSubscription } from '@/hooks/useSubscription'
+import { Media as MediaComponent } from '@/components/Media'
+import { usePostViewerImageAccess } from '@/hooks/usePostViewerImageAccess'
 import { trackImageView } from '@/lib/imageTracking'
 import { useUserContext } from '@/context/UserContext'
-import { useEffect, useRef } from 'react'
 
 export const PostHero: React.FC<{
   post: Post
-}> = ({ post }) => {
+  /** Server index: post has entitlement "none" packages */
+  guestBookable?: boolean
+}> = ({ post, guestBookable: guestBookableFromServer }) => {
   const { categories, heroImage, meta, populatedAuthors, publishedAt, title, slug } = post
-  const { isSubscribed, isLoading: isSubscriptionLoading } = useSubscription()
   const { currentUser } = useUserContext()
   const trackedRef = useRef(false)
+
+  const {
+    canViewFullImage,
+    isAccessPending,
+    showRestrictedPlaceholder,
+  } = usePostViewerImageAccess(post.id, guestBookableFromServer)
 
   const hasAuthors =
     populatedAuthors && populatedAuthors.length > 0 && formatAuthors(populatedAuthors) !== ''
 
-  // Prioritize heroImage (original behavior), fall back to meta.image for layout animation matching
   const displayImage = heroImage || meta?.image
-  
-  // Only show image if user has active subscription
-  // Don't show image while subscription status is loading to avoid flash
-  const shouldShowImage = !isSubscriptionLoading && isSubscribed && displayImage
+  const heroMedia =
+    displayImage && typeof displayImage === 'object' ? (displayImage as Media) : null
 
-  // Track when non-subscribers would view the image (restricted content)
+  const shouldShowImage = Boolean(heroMedia && canViewFullImage)
+
   useEffect(() => {
-    if (!isSubscriptionLoading && !isSubscribed && displayImage && !trackedRef.current) {
+    if (showRestrictedPlaceholder && heroMedia && !trackedRef.current) {
       trackedRef.current = true
-      // Track restricted image view attempt
       trackImageView({
         postId: post.id,
         postTitle: title,
-        imageId: typeof displayImage === 'object' && displayImage !== null ? displayImage.id : undefined,
+        imageId: heroMedia.id,
         isRestricted: true,
         userId: currentUser?.id,
         userEmail: currentUser?.email,
       })
     }
-  }, [isSubscriptionLoading, isSubscribed, displayImage, post.id, title, currentUser])
+  }, [showRestrictedPlaceholder, heroMedia, post.id, title, currentUser])
 
   return (
     <div className="relative -mt-[10.4rem] flex items-end" style={{ paddingTop: '22rem' }}>
@@ -97,36 +100,37 @@ export const PostHero: React.FC<{
           </div>
         </div>
       </div>
-      <motion.div 
-        className="absolute inset-0 min-h-[80vh] select-none"
+      <motion.div
+        className="absolute inset-0 min-h-[80vh] select-none bg-gray-900"
         layoutId={slug ? `post-image-${slug}` : undefined}
         transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
         style={{ zIndex: -1 }}
       >
-        {shouldShowImage && typeof displayImage !== 'string' ? (
+        {shouldShowImage ? (
           <motion.div
-            className="absolute inset-0 w-full h-full"
+            className="absolute inset-0 h-full w-full"
             layoutId={slug ? `post-image-content-${slug}` : undefined}
             transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
           >
-            <Media 
-              fill 
-              priority 
-              imgClassName="object-cover" 
-              resource={displayImage}
+            <MediaComponent
+              fill
+              priority
+              className="absolute inset-0 h-full w-full"
+              imgClassName="object-cover"
+              resource={heroMedia}
               postId={post.id}
               postTitle={title}
-              disableThrottling={true} // Subscribers see full image, no throttling needed
+              disableThrottling
             />
           </motion.div>
-        ) : (
-          // Show gradient background for non-subscribers (no image)
-          <div className="absolute inset-0 w-full h-full bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900" />
-        )}
+        ) : showRestrictedPlaceholder ? (
+          <div className="absolute inset-0 h-full w-full bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900" />
+        ) : isAccessPending ? (
+          <div className="absolute inset-0 h-full w-full bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 animate-pulse" />
+        ) : null}
         <div className="absolute pointer-events-none left-0 bottom-0 w-full h-1/2 bg-gradient-to-t from-black to-transparent z-10" />
       </motion.div>
-      {/* Members-only badge positioned outside the z-index: -1 container */}
-      {!shouldShowImage && displayImage && (
+      {showRestrictedPlaceholder && heroMedia && (
         <div className="absolute bottom-4 left-4 md:bottom-6 md:right-6 md:left-auto z-[60] pointer-events-auto">
           <Link
             href="/subscribe"
