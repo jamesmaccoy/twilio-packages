@@ -92,7 +92,7 @@ export function CookieConsent() {
             <div className="mt-4 flex flex-wrap gap-2">
               <Button
                 onClick={acceptAll}
-                className="bg-teal-600 hover:bg-teal-700 text-white"
+                className="bg-blue-950 hover:bg-blue-700 text-white"
                 size="sm"
               >
                 Accept All
@@ -106,7 +106,7 @@ export function CookieConsent() {
               </Button>
               <a
                 href="/privacy-policy"
-                className="text-sm text-teal-600 hover:underline self-center ml-2"
+                className="text-sm text-blue-600 hover:underline self-center ml-2"
               >
                 Learn More
               </a>
