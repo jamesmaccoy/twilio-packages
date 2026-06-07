@@ -883,100 +883,6 @@ export default function EstimateDetailsClientPage({ data, user }: Props) {
                   <h1 className="text-2xl font-bold">{postTitle}</h1>
                 </div>
 
-                {/* Shared with Section */}
-                <div className="space-y-3 pt-4 border-t border-border">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-semibold">Shared with</h2>
-                    <span className="text-xs text-muted-foreground">{onlineCount} online</span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="flex -space-x-2">
-                        {/* Customer Avatar */}
-                        <Gravatar
-                          email={typeof data.customer === 'object' ? data.customer?.email : null}
-                          size={40}
-                          alt={typeof data.customer === 'string' ? 'Customer' : data.customer?.name || 'Customer'}
-                          className="h-10 w-10 rounded-full border-2 border-background object-cover"
-                          fallback={
-                            <div className="h-10 w-10 rounded-full border-2 border-background bg-muted flex items-center justify-center">
-                              <UserIcon className="h-5 w-5 text-muted-foreground" />
-                            </div>
-                          }
-                        />
-                        
-                        {/* Guest Avatars */}
-                        {allGuests
-                          .filter((guest) =>
-                            typeof guest === 'string'
-                              ? !removedGuests.includes(guest)
-                              : !removedGuests.includes(guest.id),
-                          )
-                          .slice(0, 3)
-                          .map((guest) => {
-                            if (typeof guest === 'string') return null
-                            return (
-                              <Gravatar
-                                key={guest.id}
-                                email={guest.email}
-                                size={40}
-                                alt={guest.name || 'Guest'}
-                                className="h-10 w-10 rounded-full border-2 border-background object-cover"
-                                fallback={
-                                  <div className="h-10 w-10 rounded-full border-2 border-background bg-muted flex items-center justify-center">
-                                    <UserIcon className="h-5 w-5 text-muted-foreground" />
-                                  </div>
-                                }
-                              />
-                            )
-                          })}
-                        
-                        {/* More guests indicator */}
-                        {guestCount > 3 && (
-                          <div className="h-10 w-10 rounded-full border-2 border-background bg-muted flex items-center justify-center text-xs font-medium">
-                            +{guestCount - 3}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {data &&
-                      'customer' in data &&
-                      typeof data?.customer !== 'string' &&
-                      data.customer?.id === user.id && (
-                        <InviteUrlDialog
-                          trigger={
-                            <Button variant="outline" size="sm" className="gap-2">
-                              <PlusCircleIcon className="h-4 w-4" />
-                              <span>Invite</span>
-                            </Button>
-                          }
-                          estimateId={data.id}
-                          type="estimates"
-                        />
-                      )}
-                  </div>
-
-                  {/* Share Link Section */}
-                  {shareLink && (
-                    <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
-                      <span className="text-xs text-muted-foreground flex-1 truncate font-mono">
-                        {shareLink.replace(window.location.origin, '').substring(0, 30)}...
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={copyShareLink}
-                        className="h-8 gap-2"
-                      >
-                        <Copy className="h-3 w-3" />
-                        <span className="text-xs">{shareLinkCopied ? 'Copied!' : 'Copy'}</span>
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
                 {/* Booking Period */}
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border">
                   <div>
@@ -1305,26 +1211,102 @@ export default function EstimateDetailsClientPage({ data, user }: Props) {
             </TabsContent>
 
           <TabsContent value="guests" className="mt-0">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold">Guests</h2>
-                {data &&
-                  'customer' in data &&
-                  typeof data?.customer !== 'string' &&
-                  data.customer?.id === user.id && (
-                    <InviteUrlDialog
-                      trigger={
-                        <Button>
-                          <PlusCircleIcon className="size-4 mr-2" />
-                          <span>Invite</span>
-                        </Button>
-                      }
-                      estimateId={data.id}
-                      type="estimates"
-                    />
-                  )}
+            <div className="p-6 space-y-6">
+              {/* Shared with Section */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold">Shared with</h2>
+                  <span className="text-xs text-muted-foreground">{onlineCount} online</span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="flex -space-x-2">
+                      {/* Customer Avatar */}
+                      <Gravatar
+                        email={typeof data.customer === 'object' ? data.customer?.email : null}
+                        size={40}
+                        alt={typeof data.customer === 'string' ? 'Customer' : data.customer?.name || 'Customer'}
+                        className="h-10 w-10 rounded-full border-2 border-background object-cover"
+                        fallback={
+                          <div className="h-10 w-10 rounded-full border-2 border-background bg-muted flex items-center justify-center">
+                            <UserIcon className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                        }
+                      />
+
+                      {/* Guest Avatars */}
+                      {allGuests
+                        .filter((guest) =>
+                          typeof guest === 'string'
+                            ? !removedGuests.includes(guest)
+                            : !removedGuests.includes(guest.id),
+                        )
+                        .slice(0, 3)
+                        .map((guest) => {
+                          if (typeof guest === 'string') return null
+                          return (
+                            <Gravatar
+                              key={guest.id}
+                              email={guest.email}
+                              size={40}
+                              alt={guest.name || 'Guest'}
+                              className="h-10 w-10 rounded-full border-2 border-background object-cover"
+                              fallback={
+                                <div className="h-10 w-10 rounded-full border-2 border-background bg-muted flex items-center justify-center">
+                                  <UserIcon className="h-5 w-5 text-muted-foreground" />
+                                </div>
+                              }
+                            />
+                          )
+                        })}
+
+                      {/* More guests indicator */}
+                      {guestCount > 3 && (
+                        <div className="h-10 w-10 rounded-full border-2 border-background bg-muted flex items-center justify-center text-xs font-medium">
+                          +{guestCount - 3}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {data &&
+                    'customer' in data &&
+                    typeof data?.customer !== 'string' &&
+                    data.customer?.id === user.id && (
+                      <InviteUrlDialog
+                        trigger={
+                          <Button variant="outline" size="sm" className="gap-2">
+                            <PlusCircleIcon className="h-4 w-4" />
+                            <span>Invite</span>
+                          </Button>
+                        }
+                        estimateId={data.id}
+                        type="estimates"
+                      />
+                    )}
+                </div>
+
+                {/* Share Link Section */}
+                {shareLink && (
+                  <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+                    <span className="text-xs text-muted-foreground flex-1 truncate font-mono">
+                      {shareLink.replace(window.location.origin, '').substring(0, 30)}...
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={copyShareLink}
+                      className="h-8 gap-2"
+                    >
+                      <Copy className="h-3 w-3" />
+                      <span className="text-xs">{shareLinkCopied ? 'Copied!' : 'Copy'}</span>
+                    </Button>
+                  </div>
+                )}
               </div>
-              <div className="mt-2 space-y-3">
+
+              <div className="space-y-3 pt-4 border-t border-border">
                 <div className="shadow-sm p-2 border border-border rounded-lg flex items-center gap-2">
                   <Gravatar
                     email={typeof data.customer === 'object' ? data.customer?.email : null}
