@@ -37,14 +37,14 @@ export async function POST(request: NextRequest) {
         body = Object.fromEntries(formData.entries())
       }
     }
-    
+
     // Payload admin sometimes puts JSON into `_payload`
     if (body?._payload && typeof body._payload === 'string') {
       try {
         const payloadData = JSON.parse(body._payload)
         body = { ...body, ...payloadData }
         delete body._payload
-      } catch {}
+      } catch { }
     }
 
     // Normalize common admin field shapes: { value: ... }
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     // Validate required fields (Payload admin may send `username` instead of `email`)
     const email = normalizeValue((body as any).email) ?? normalizeValue((body as any).username)
     const password = normalizeValue((body as any).password)
-    
+
     if (!email || !password) {
       if (process.env.NODE_ENV === 'development') {
         return NextResponse.json(
@@ -77,8 +77,8 @@ export async function POST(request: NextRequest) {
           { status: 400 },
         )
       }
-      return NextResponse.json({ 
-        error: 'Email and password are required' 
+      return NextResponse.json({
+        error: 'Email and password are required'
       }, { status: 400 })
     }
 
@@ -92,8 +92,8 @@ export async function POST(request: NextRequest) {
     })
 
     if (!user || !token) {
-      return NextResponse.json({ 
-        error: 'Invalid email or password' 
+      return NextResponse.json({
+        error: 'Invalid email or password'
       }, { status: 401 })
     }
 
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
     return response
   } catch (error) {
     console.error('Error during login:', error)
-    
+
     // Handle specific authentication errors
     if (error instanceof Error && error.message?.includes('Invalid credentials')) {
       return NextResponse.json(

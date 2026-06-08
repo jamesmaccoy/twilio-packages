@@ -120,14 +120,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const userRoles = Array.isArray(user.role) ? user.role : user.role ? [user.role] : []
-    const isAdminOrHost = userRoles.includes('admin') || userRoles.includes('host')
-    if (!isAdminOrHost) {
-      return NextResponse.json(
-        { error: 'Insufficient permissions. Only admins and hosts can create bookings.' },
-        { status: 403 },
-      )
-    }
 
     // Parse request body (Payload admin may send multipart/form-data with `_payload`)
     let body: any = {}
@@ -210,6 +202,36 @@ export async function POST(request: NextRequest) {
     body.fromDate = normalizeValue(body.fromDate)
     body.toDate = normalizeValue(body.toDate)
     body.total = normalizeValue(body.total)
+    body.paymentStatus = normalizeValue(body.paymentStatus)
+
+    if (body.paymentStatus === 'pending') {
+      body.paymentStatus = 'unpaid'
+    }
+
+    const userRoles = Array.isArray(user.role) ? user.role : user.role ? [user.role] : []
+    const isAdminOrHost = userRoles.includes('admin') || userRoles.includes('host')
+    const isCustomer = userRoles.includes('customer')
+
+    if (isCustomer && !body.customer) {
+      body.customer = user.id
+    }
+
+    const isCustomerSelfBooking =
+      isCustomer &&
+      body.customer === user.id &&
+      (!body.paymentStatus || body.paymentStatus === 'unpaid')
+
+    if (!isAdminOrHost && !isCustomerSelfBooking) {
+      return NextResponse.json(
+        {
+          error:
+            'Insufficient permissions. Only admins, hosts, or customers booking for themselves can create bookings.',
+        },
+        { status: 403 },
+      )
+    }
+
+
 
     const requiredFields = ['title', 'post', 'fromDate', 'total'] as const
     const missing = requiredFields.filter((f) => {

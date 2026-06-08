@@ -203,6 +203,15 @@ You can freely answer questions about their bookings and packages, but when they
 When the user asks to create/manage a package from a prompt, call the buildPackageDraft tool.
 It must return a complete package object ready to save in the database (all required fields populated, sensible defaults filled in).
 
+📅 BOOKINGS & GETAWAYS:
+- When the user wants to check if dates/weekend is free/available for a property (post), call checkAvailability.
+- When the user wants to book a getaway/stay for a property:
+  1. ALWAYS call checkAvailability first for the requested dates to make sure they are free.
+  2. If the dates are available, call bookProperty to reserve the property.
+  3. Inform the user that you have provisionally reserved the room for them.
+  4. Provide the secure checkout/payment link returned in 'paymentUrl' so they can complete the payment via Yoco (e.g., "Please click this secure link to complete the payment via Yoco: [Complete Payment](paymentUrl)").
+  5. If the dates are not available, check the alternative 'suggestedDates' returned by checkAvailability and propose those to the user.
+
 Always express prices in South African Rand (R), not cents.`
 
       // Keep model configurable because availability varies by Google project/API rollout.
@@ -325,6 +334,207 @@ Always express prices in South African Rand (R), not cents.`
               }
             },
           }),
+          // @ts-ignore - tool typing differs across AI SDK versions
+          checkAvailability: tool({
+            description: 'Check if a property (post) is available for booking for a specific date range.',
+            parameters: z.object({
+              postId: z.string().describe('The database ID of the property to check.'),
+              startDate: z.string().describe('ISO string or YYYY-MM-DD of the check-in date.'),
+              endDate: z.string().describe('ISO string or YYYY-MM-DD of the check-out date.'),
+              packageId: z.string().optional().describe('Optional ID of the package to check concurrency for.'),
+            }),
+            // @ts-expect-error - AI SDK tool typing differs across versions
+            execute: async ({ postId, startDate, endDate, packageId }) => {
+              try {
+                const url = new URL(req.url)
+                const checkUrl = new URL(`${url.origin}/api/bookings/check-availability`)
+                checkUrl.searchParams.set('postId', postId)
+                checkUrl.searchParams.set('startDate', startDate)
+                checkUrl.searchParams.set('endDate', endDate)
+                if (packageId) checkUrl.searchParams.set('packageId', packageId)
+
+                // Forward auth headers
+                const headers = new Headers()
+                const cookie = req.headers.get('cookie')
+                if (cookie) headers.set('cookie', cookie)
+                const authorization = req.headers.get('authorization')
+                if (authorization) headers.set('authorization', authorization)
+
+                const response = await fetch(checkUrl.toString(), {
+                  method: 'GET',
+                  headers,
+                })
+
+                if (!response.ok) {
+                  const errorText = await response.text()
+                  return { success: false, error: `Failed to check availability: ${errorText}` }
+                }
+
+                const data = await response.json()
+                return data
+              } catch (error: any) {
+                console.error('Error in checkAvailability tool:', error)
+                return { success: false, error: error.message || 'Unknown error' }
+              }
+            },
+          }),
+          // @ts-ignore - tool typing differs across AI SDK versions
+          bookProperty: tool({
+            description: 'Creates a provisional property reservation (paymentStatus unpaid) on SimplePlek and generates a secure Yoco payment link.',
+            parameters: z.object({
+              postId: z.string().describe('The database ID of the property to reserve.'),
+              fromDate: z.string().describe('ISO string or YYYY-MM-DD of the check-in date.'),
+              toDate: z.string().describe('ISO string or YYYY-MM-DD of the check-out date.'),
+              packageId: z.string().optional().describe('Optional ID of the package to book.'),
+              total: z.number().optional().describe('Optional total price in whole Rands. If not provided, will be calculated from property/package rates.'),
+            }),
+            // @ts-expect-error - AI SDK tool typing differs across versions
+            execute: async ({ postId, fromDate, toDate, packageId, total }) => {
+              try {
+                const url = new URL(req.url)
+                const checkIn = new Date(fromDate)
+                const checkOut = new Date(toDate)
+                const nights = Math.max(1, Math.round((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)))
+
+                // Fetch payload and details
+                const payload = await getPayload({ config: configPromise })
+                
+                // Fetch property details
+                const property = await payload.findByID({
+                  collection: 'posts',
+                  id: postId,
+                  depth: 0,
+                })
+
+                if (!property) {
+                  return { success: false, error: `Property not found with ID ${postId}` }
+                }
+
+                // Resolve package and total price
+                let selectedPackageDoc: any = null
+                if (packageId) {
+                  selectedPackageDoc = await payload.findByID({
+                    collection: 'packages',
+                    id: packageId,
+                    depth: 0,
+                  })
+                } else {
+                  // Find first enabled package for the post
+                  const packagesList = await payload.find({
+                    collection: 'packages',
+                    where: {
+                      post: { equals: postId },
+                      isEnabled: { equals: true },
+                    },
+                    limit: 1,
+                  })
+                  if (packagesList.docs.length > 0) {
+                    selectedPackageDoc = packagesList.docs[0]
+                  }
+                }
+
+                let calculatedTotal = total
+                if (!calculatedTotal) {
+                  if (selectedPackageDoc) {
+                    if (selectedPackageDoc.baseRate && selectedPackageDoc.baseRate > 0) {
+                      calculatedTotal = selectedPackageDoc.baseRate
+                    } else {
+                      calculatedTotal = (property.baseRate || 0) * (selectedPackageDoc.multiplier || 1) * nights
+                    }
+                  } else {
+                    calculatedTotal = (property.baseRate || 0) * nights
+                  }
+                }
+
+                // Create booking payload
+                const bookingData: any = {
+                  title: `Booking for ${property.title}`,
+                  post: postId,
+                  fromDate: checkIn.toISOString(),
+                  toDate: checkOut.toISOString(),
+                  total: calculatedTotal,
+                  paymentStatus: 'pending',
+                  customer: user.id,
+                }
+
+                if (selectedPackageDoc) {
+                  bookingData.packageType = selectedPackageDoc.id
+                  bookingData.selectedPackage = {
+                    package: selectedPackageDoc.id,
+                    customName: selectedPackageDoc.name,
+                    enabled: true,
+                  }
+                }
+
+                // Call local booking endpoint to create record
+                const headers = new Headers()
+                const cookie = req.headers.get('cookie')
+                if (cookie) headers.set('cookie', cookie)
+                const authorization = req.headers.get('authorization')
+                if (authorization) headers.set('authorization', authorization)
+                headers.set('Content-Type', 'application/json')
+
+                const bookingResponse = await fetch(`${url.origin}/api/bookings`, {
+                  method: 'POST',
+                  headers,
+                  body: JSON.stringify(bookingData),
+                })
+
+                if (!bookingResponse.ok) {
+                  const errorData = await bookingResponse.json()
+                  return { success: false, error: errorData.error || 'Failed to create booking' }
+                }
+
+                const createdBooking = await bookingResponse.json()
+
+                // Generate Yoco payment link
+                const paymentLinkPayload = {
+                  packageData: selectedPackageDoc ? {
+                    id: selectedPackageDoc.id,
+                    name: selectedPackageDoc.name,
+                    description: selectedPackageDoc.description,
+                    baseRate: selectedPackageDoc.baseRate,
+                    revenueCatId: selectedPackageDoc.revenueCatId,
+                  } : undefined,
+                  customerName: user.name || user.email || 'Guest',
+                  total: calculatedTotal,
+                  postId,
+                  bookingId: createdBooking.id,
+                  startDate: checkIn.toISOString(),
+                  endDate: checkOut.toISOString(),
+                }
+
+                const paymentResponse = await fetch(`${url.origin}/api/yoco/payment-links`, {
+                  method: 'POST',
+                  headers,
+                  body: JSON.stringify(paymentLinkPayload),
+                })
+
+                if (!paymentResponse.ok) {
+                  const errorData = await paymentResponse.json()
+                  return {
+                    success: true,
+                    booking: createdBooking,
+                    warning: 'Booking created but failed to generate Yoco payment link.',
+                    error: errorData.error || 'Payment link creation failed',
+                  }
+                }
+
+                const paymentData = await paymentResponse.json()
+
+                return {
+                  success: true,
+                  booking: createdBooking,
+                  paymentUrl: paymentData.paymentLink?.url || null,
+                  message: 'Provisional reservation created successfully. Please complete payment using the link.',
+                }
+              } catch (error: any) {
+                console.error('Error in bookProperty tool:', error)
+                return { success: false, error: error.message || 'Unknown error' }
+              }
+            },
+          }),
+
         },
       })
 
